@@ -22,8 +22,8 @@ DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
 DEF_STATE = {'pager': True}
 
-URL_CRED_PATTERN = '://(.+)@'
-URL_CRED_REPLACE = '://***@'
+URL_CRED_PATTERN = r'://(.+)@'
+URL_CRED_REPLACE = r'://***@'
 
 SQL_COMPLETIONS = ['select', 'insert', 'update', 'delete', 'create', 'drop', 'from', 'where', 'and', 'or', 'not', 'like', 'order by', 'group by', 'into', 'values']
 
@@ -40,8 +40,8 @@ class Squelch(object):
         'query_quoted_string_pattern': r"'[^']+'",
         'query_params_pattern': r':([a-z0-9_.]+)',
         'repl_commands': {
-            'quit': ['\q'],
-            'state': ['\set', '\pset']
+            'quit': [r'\q'],
+            'state': [r'\set', r'\pset']
         },
         'table_opts': {
             # Unfortunately, tabulate doesn't recognise a sqlalchemy result
@@ -139,9 +139,9 @@ class Squelch(object):
         :type cmd: str
         """
 
-        if cmd.lower() == '\pset pager off':
+        if cmd.lower() == r'\pset pager off':
             self.state['pager'] = False
-        elif cmd.lower() == '\pset pager on':
+        elif cmd.lower() == r'\pset pager on':
             self.state['pager'] = True
  
     def connect(self, url):
