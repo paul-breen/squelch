@@ -120,9 +120,14 @@ class Squelch(object):
         :type key: str
         :returns: The configuration item's value
         :rtype: any
+        :raises: KeyError
         """
 
-        return self.conf.get(key, self.DEFAULTS[key])
+        # If self.conf contains key but self.DEFAULTS does not, then using
+        # self.DEFAULTS[key] as our default will raise KeyError, even though
+        # there's a value available in self.conf.  In other words, we can't
+        # do: self.conf.get(key, self.DEFAULTS[key])
+        return self.conf[key] if key in self.conf else self.DEFAULTS[key]
 
     def set_state(self, cmd):
         """
