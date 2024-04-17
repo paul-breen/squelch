@@ -273,7 +273,6 @@ class Squelch(object):
         :type raw: str
         """
 
-
         self.query = None
         self.params = {}
 
