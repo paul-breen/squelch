@@ -1,0 +1,3 @@
+{
+  "url": "dialect[+driver]://user:password@host/dbname"
+}
