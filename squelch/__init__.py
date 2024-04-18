@@ -41,7 +41,9 @@ class Squelch(object):
         'query_params_pattern': r':([a-z0-9_.]+)',
         'repl_commands': {
             'quit': [r'\q'],
-            'state': [r'\set', r'\pset']
+            'state': [r'\set', r'\pset'],
+            'help': [r'help', r'\?'],
+            'dist': [r'\copyright']
         },
         'table_opts': {
             # Unfortunately, tabulate doesn't recognise a sqlalchemy result
@@ -143,7 +145,101 @@ class Squelch(object):
             self.state['pager'] = False
         elif cmd.lower() == r'\pset pager on':
             self.state['pager'] = True
- 
+
+    def get_welcome_text(self):
+        """
+        Get the welcome text
+
+        * Shows program information
+        * Signposts the user how to get help
+
+        :returns: The welcome text
+        :rtype: str
+        """
+
+        text = f"""{PROGNAME} ({__version__})
+Type "help" for help.
+"""
+
+        return text
+
+    def get_help_summary_text(self):
+        """
+        Get the help summary text
+
+        Tells the user how to get:
+
+        * Distribution terms
+        * Help with the REPL commands
+        * How to quit
+
+        :returns: The help summary text
+        :rtype: str
+        """
+
+        text = f"""You are using {PROGNAME}, a CLI to SQLAlchemy-supported database engines.
+Type:  \copyright for distribution terms
+       \? for help with {PROGNAME} commands
+       \q to quit"""
+
+        return text
+
+    def get_help_repl_cmd_text(self):
+        """
+        Get the REPL command help text
+
+        :returns: The REPL command help text
+        :rtype: str
+        """
+
+        text = f"""General
+  \copyright             show {PROGNAME} usage and distribution terms
+  \q                     quit {PROGNAME}
+
+Help
+  \?                     show help on backslash commands
+
+Formatting
+  \pset [NAME [VALUE]]   set table output option
+                         (pager)
+"""
+
+        return text
+
+    def get_help(self, cmd):
+        """
+        Get the progam's help text according to the given command
+
+        * help: Get the help summary text
+        * \?: Get the REPL command text
+
+        :param cmd: The help command
+        :type cmd: str
+        :returns: The help text corresponding to the given command
+        :rtype: str
+        """
+
+        text = ''
+
+        if cmd.lower() == r'help':
+            text = self.get_help_summary_text()
+        elif cmd.lower() == r'\?':
+            text = self.get_help_repl_cmd_text()
+
+        return text
+
+    def get_dist_terms_text(self):
+        """
+        Get the program's distribution terms text
+
+        :returns: The program's distribution terms text
+        :rtype: str
+        """
+
+        text = f"""{PROGNAME} ({__version__}) distributed under Apache-2.0 license: https://spdx.org/licenses/Apache-2.0.html"""
+
+        return text
+
     def connect(self, url):
         """
         Connect to the database in the given connection URL
@@ -284,6 +380,10 @@ class Squelch(object):
                 sys.exit(0)
             elif cmd in self.get_conf_item('repl_commands')['state']:
                 self.set_state(raw)
+            elif cmd in self.get_conf_item('repl_commands')['help']:
+                print(self.get_help(raw))
+            elif cmd in self.get_conf_item('repl_commands')['dist']:
+                print(self.get_dist_terms_text())
             else:
                 self.query = text(raw)
                 self.params = self.prompt_for_query_params(raw)
@@ -337,6 +437,8 @@ class Squelch(object):
         logger.info(f"setting input completions")
         readline.parse_and_bind("tab: complete")
         readline.set_completer(self.input_completions)
+
+        print(self.get_welcome_text())
 
     def complete_repl(self):
         """

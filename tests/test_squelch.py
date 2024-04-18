@@ -51,7 +51,7 @@ def test_get_conf_debug(unconfigured_squelch, file, expected, caplog):
 @pytest.mark.parametrize(['conf','key','expected'], [
 ({'url': 'd://u:p@h/db'}, 'url', 'd://u:p@h/db'),
 ({'url': 'd://u:p@h/db', 'verbose': 2}, 'verbose', 2),
-({}, 'repl_commands', {'quit': [r'\q'],'state': [r'\set', r'\pset']}),
+({}, 'repl_commands', squelch.Squelch.DEFAULTS['repl_commands']),
 ])
 def test_get_conf_item(unconfigured_squelch, conf, key, expected):
     f = unconfigured_squelch
