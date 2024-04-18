@@ -46,7 +46,7 @@ class Squelch(object):
         'table_opts': {
             # Unfortunately, tabulate doesn't recognise a sqlalchemy result
             # as having keys(), so we can't set 'headers': 'keys' here
-            'tablefmt': 'presto', 'showindex': False
+            'tablefmt': 'presto', 'showindex': False, 'disable_numparse': True
         }
     }
  
