@@ -21,12 +21,12 @@ DEF_CONF_FILE = './squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
 DEF_STATE = {'pager': True, 'footer': True, 'AUTOCOMMIT': True}
-DEF_MIN_FOOTER = '\n'
+DEF_MIN_FOOTER = '\n'             # Blank line to separate table from prompt
 
 URL_CRED_PATTERN = r'://(.+)@'
 URL_CRED_REPLACE = r'://***@'
 
-SQL_COMPLETIONS = ['select', 'insert', 'update', 'delete', 'create', 'drop', 'from', 'where', 'and', 'or', 'not', 'like', 'order by', 'group by', 'into', 'values']
+SQL_COMPLETIONS = ['select', 'insert', 'update', 'delete', 'create', 'drop', 'from', 'where', 'and', 'or', 'not', 'like', 'order by', 'group by', 'into', 'values','begin', 'transaction', 'commit', 'rollback']
 
 logger = logging.getLogger(__name__)
 
@@ -354,6 +354,31 @@ Variables
 
         return footer
 
+    def get_command_response(self):
+        """
+        Get the non-query command response
+
+        The response shows the command name and the affected row count
+
+        * Access to the row count is dependent on the DB engine supporting
+          this.  It should be supported for UPDATE and DELETE, but may not
+          be supported for INSERT or SELECT.
+
+        :returns: The command response text
+        :rtype: str
+        """
+
+        response = ''
+
+        if self.query.text:
+            response = self.query.text.split()[0].upper()
+
+        if self.result.supports_sane_rowcount and self.result.rowcount != -1:
+            logger.debug(f"row count available in the result cursor")
+            response = f'{response} {self.result.rowcount}'
+
+        return response
+
     def present_result(self, table_opts=None):
         """
         Present the result set of the latest executed query
@@ -373,20 +398,22 @@ Variables
         table_opts = table_opts or self.get_conf_item('table_opts')
         logger.debug(f"table_opts: {table_opts}")
 
-        if self.result and self.result.returns_rows:
-            table = tabulate(self.result, headers=self.result.keys(), **table_opts)
+        if self.result:
+            if self.result.returns_rows:
+                table = tabulate(self.result, headers=self.result.keys(), **table_opts)
 
-            if table:
-                if self.state.get('footer'):
-                    table += self.get_result_table_footer(table, table_opts)
-                else:
-                    # No footer, add blank line to separate table from prompt
-                    table += DEF_MIN_FOOTER
+                if table:
+                    if self.state.get('footer'):
+                        table += self.get_result_table_footer(table, table_opts)
+                    else:
+                        table += DEF_MIN_FOOTER
 
-                if self.state.get('pager'):
-                    pydoc.pager(table)
-                else:
-                    print(table)
+                    if self.state.get('pager'):
+                        pydoc.pager(table)
+                    else:
+                        print(table)
+            else:
+                print(self.get_command_response())
 
     def prompt_for_query_params(self, raw):
         """
@@ -462,7 +489,6 @@ Variables
         # Disable autocommit during an explicit transaction
         if cmd == 'begin':
             self.state['AUTOCOMMIT'] = False
-            print('BEGIN')
 
         self.query = text(raw)
         self.params = self.prompt_for_query_params(raw)
@@ -471,10 +497,8 @@ Variables
 
         if cmd == 'rollback':
             self.state['AUTOCOMMIT'] = True
-            print('ROLLBACK')
         elif cmd == 'commit':
             self.state['AUTOCOMMIT'] = True
-            print('COMMIT')
 
     def process_input(self, raw):
         """
