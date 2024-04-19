@@ -352,7 +352,9 @@ Formatting
 
         * If the state variable 'pager' is True, the output is paged using the
           system pager, otherwise the whole table is printed to the output
-          stream
+          stream.
+        * If the state variable 'footer' is True, then a footer is appended to
+          the result table.
 
         :param table_opts: Options for rendering the tabulated result output
         :type table_opts: dict
@@ -365,13 +367,13 @@ Formatting
             table = tabulate(self.result, headers=self.result.keys(), **table_opts)
 
             if table:
-                if self.state['footer']:
+                if self.state.get('footer'):
                     table += self.get_result_table_footer(table, table_opts)
                 else:
                     # No footer, add blank line to separate table from prompt
                     table += '\n'
 
-                if self.state['pager']:
+                if self.state.get('pager'):
                     pydoc.pager(table)
                 else:
                     print(table)
