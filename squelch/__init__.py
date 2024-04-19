@@ -20,7 +20,7 @@ PROGNAME = __name__
 DEF_CONF_FILE = './squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
-DEF_STATE = {'pager': True}
+DEF_STATE = {'pager': True, 'footer': True}
 
 URL_CRED_PATTERN = r'://(.+)@'
 URL_CRED_REPLACE = r'://***@'
@@ -141,10 +141,16 @@ class Squelch(object):
         :type cmd: str
         """
 
-        if cmd.lower() == r'\pset pager off':
-            self.state['pager'] = False
-        elif cmd.lower() == r'\pset pager on':
-            self.state['pager'] = True
+        if cmd.lower().startswith(r'\pset pager'):
+            if cmd.lower() == r'\pset pager off':
+                self.state['pager'] = False
+            elif cmd.lower() == r'\pset pager on':
+                self.state['pager'] = True
+        elif cmd.lower().startswith(r'\pset footer'):
+            if cmd.lower() == r'\pset footer off':
+                self.state['footer'] = False
+            elif cmd.lower() == r'\pset footer on':
+                self.state['footer'] = True
 
     def get_welcome_text(self):
         """
@@ -284,6 +290,50 @@ Formatting
 
         return self.result
 
+    def get_result_table_footer(self, table, table_opts):
+        """
+        Get the result table footer
+
+        The footer shows the row count of the table data
+
+        * Access to the row count is dependent on the DB engine supporting
+          this.  It should be supported for UPDATE and DELETE, but may not
+          be supported for INSERT or SELECT.
+        * If row count isn't supported by the DB engine, then a fallback is
+          to employ a heuristic to calculate the number of rows based on the
+          number of newlines found in the table.  Whilst this works for the
+          default `tablefmt` table option, it won't work for `tablefmt`
+          styles that have more or less table grid lines.
+
+        :param table: The result table text
+        :type table: str
+        :param table_opts: Options for rendering the tabulated result output
+        :type table_opts: dict
+        :returns: The result table footer text
+        :rtype: str
+        """
+
+        footer = ''
+
+        if self.result.supports_sane_rowcount and self.result.rowcount != -1:
+            logger.debug(f"row count available in the result cursor")
+            nrows = self.result.rowcount
+        else:
+            try:
+                if table_opts['tablefmt'] == self.DEFAULTS['table_opts']['tablefmt']:
+                    logger.debug(f"row count calculated from lines in the table")
+                    nrows = table.count('\n') - 1
+            except KeyError:
+                nrows = -1
+
+        if nrows != -1:
+            row_text = 'row' if nrows == 1 else 'rows'
+            footer = f'\n({nrows} {row_text})\n'
+        else:
+            logger.debug(f"row count not available")
+
+        return footer
+
     def present_result(self, table_opts=None):
         """
         Present the result set of the latest executed query
@@ -304,10 +354,17 @@ Formatting
         if self.result and self.result.returns_rows:
             table = tabulate(self.result, headers=self.result.keys(), **table_opts)
 
-            if self.state['pager']:
-                pydoc.pager(table)
-            else:
-                print(table)
+            if table:
+                if self.state['footer']:
+                    table += self.get_result_table_footer(table, table_opts)
+                else:
+                    # No footer, add blank line to separate table from prompt
+                    table += '\n'
+
+                if self.state['pager']:
+                    pydoc.pager(table)
+                else:
+                    print(table)
 
     def prompt_for_query_params(self, raw):
         """
