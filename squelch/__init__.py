@@ -157,7 +157,7 @@ class Squelch(object):
         :rtype: str
         """
 
-        text = f"""{PROGNAME} ({__version__})
+        text = fr"""{PROGNAME} ({__version__})
 Type "help" for help.
 """
 
@@ -177,7 +177,7 @@ Type "help" for help.
         :rtype: str
         """
 
-        text = f"""You are using {PROGNAME}, a CLI to SQLAlchemy-supported database engines.
+        text = fr"""You are using {PROGNAME}, a CLI to SQLAlchemy-supported database engines.
 Type:  \copyright for distribution terms
        \? for help with {PROGNAME} commands
        \q to quit"""
@@ -192,7 +192,7 @@ Type:  \copyright for distribution terms
         :rtype: str
         """
 
-        text = f"""General
+        text = fr"""General
   \copyright             show {PROGNAME} usage and distribution terms
   \q                     quit {PROGNAME}
 
@@ -207,7 +207,7 @@ Formatting
         return text
 
     def get_help(self, cmd):
-        """
+        r"""
         Get the progam's help text according to the given command
 
         * help: Get the help summary text
