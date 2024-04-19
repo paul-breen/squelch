@@ -76,12 +76,26 @@ def test_get_conf_item_error(unconfigured_squelch, conf, key, expected):
 ({'pager': False}, 'pager', r'\pset pager on', True),
 ({'pager': True}, 'pager', r'\PSET PAGER OFF', False),
 ({'pager': True}, 'pager', r'\PSET PAGER ON', True),
+({'pager': True}, 'pager', r'\pset pager false', False),
+({'pager': True}, 'pager', r'\pset pager 0', False),
+({'pager': False}, 'pager', r'\pset pager true', True),
+({'pager': False}, 'pager', r'\pset pager 1', True),
 ])
 def test_set_state(unconfigured_squelch, state, key, cmd, expected):
     f = unconfigured_squelch
     f.state = state
     f.set_state(cmd)
     actual = f.state[key]
+    assert actual == expected
+
+@pytest.mark.parametrize(['cmd','func'], [
+('help', 'get_help_summary_text'),
+(r'\?', 'get_help_repl_cmd_text'),
+])
+def test_get_help(unconfigured_squelch, cmd, func):
+    f = unconfigured_squelch
+    expected = getattr(f, func)()
+    actual = f.get_help(cmd)
     assert actual == expected
 
 @pytest.mark.parametrize(['query','params'], [
@@ -194,6 +208,44 @@ def test_process_input_query(unconfigured_squelch, raw, query, params, mocker):
     f.process_input(raw)
     assert f.query.compare(query)
     assert f.params == params
+
+@pytest.mark.parametrize(['raw','expected'], [
+("select * from data", ''),
+("0", ''),
+(r"\pset", None),
+(r"\pset pager on", 'Pager usage is on.'),
+(r"\pset pager off", 'Pager usage is off.'),
+])
+def test_handle_state_command(unconfigured_squelch, raw, expected, capsys):
+    f = unconfigured_squelch
+
+    if expected is None:
+        expected = str(f.state)
+
+    f.handle_state_command(raw)
+    captured = capsys.readouterr()
+    assert expected in captured.out
+
+@pytest.mark.parametrize(['raw','query','params','autocommit'], [
+("begin", text('begin'), {}, False),
+("rollback", text('rollback'), {}, True),
+("commit", text('commit'), {}, True),
+("select * from data", text('select * from data'), {}, True),
+("select * from data where id = :id", text('select * from data where id = :id'), {'id': '1'}, True),
+])
+def test_handle_query(unconfigured_squelch, raw, query, params, autocommit, mocker):
+    f = unconfigured_squelch
+    pqp = mocker.patch.object(f, 'prompt_for_query_params', return_value=params)
+    eq = mocker.patch.object(f, 'exec_query')
+    pr = mocker.patch.object(f, 'present_result')
+    f.handle_query(raw)
+    assert f.query.compare(query)
+    assert f.params == params
+    assert f.state['AUTOCOMMIT'] == autocommit
+    pqp.assert_called_once_with(raw)
+    # text(query) is not directly comparable, hence we use the actual
+    eq.assert_called_once_with(f.query, f.params)
+    pr.assert_called_once()
 
 @pytest.mark.parametrize('raw', [
 (r"\q"),
