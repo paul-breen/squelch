@@ -139,18 +139,28 @@ class Squelch(object):
 
         :param cmd: The command to update the program's state
         :type cmd: str
+        :returns: Text of the state update with which to notify the user
+        :rtype: str
         """
 
+        state_text = ''
+        falsy = r'(off|false|0|no)'
+        truthy = r'(on|true|1|yes)'
+
         if cmd.lower().startswith(r'\pset pager'):
-            if cmd.lower() == r'\pset pager off':
+            if re.match(fr'\\pset pager {falsy}', cmd.lower()):
                 self.state['pager'] = False
-            elif cmd.lower() == r'\pset pager on':
+                state_text = 'Pager usage is off.'
+            elif re.match(fr'\\pset pager {truthy}', cmd.lower()):
                 self.state['pager'] = True
+                state_text = 'Pager usage is on.'
         elif cmd.lower().startswith(r'\pset footer'):
-            if cmd.lower() == r'\pset footer off':
+            if re.match(fr'\\pset footer {falsy}', cmd.lower()):
                 self.state['footer'] = False
-            elif cmd.lower() == r'\pset footer on':
+            elif re.match(fr'\\pset footer {truthy}', cmd.lower()):
                 self.state['footer'] = True
+
+        return state_text
 
     def get_welcome_text(self):
         """
@@ -411,6 +421,22 @@ Formatting
 
         return raw
 
+    def handle_state_command(self, raw):
+        """
+        Process the given state change command
+
+        :param raw: The raw stripped input (a REPL state command)
+        :type raw: str
+        """
+
+        if len(raw.split()) > 1:
+            state_text = self.set_state(raw)
+
+            if state_text:
+                print(state_text)
+        else:
+            print(self.state)
+
     def process_input(self, raw):
         """
         Process the given input
@@ -436,7 +462,7 @@ Formatting
                 logger.info('quitting')
                 sys.exit(0)
             elif cmd in self.get_conf_item('repl_commands')['state']:
-                self.set_state(raw)
+                self.handle_state_command(raw)
             elif cmd in self.get_conf_item('repl_commands')['help']:
                 print(self.get_help(raw))
             elif cmd in self.get_conf_item('repl_commands')['dist']:
