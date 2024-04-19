@@ -21,6 +21,7 @@ DEF_CONF_FILE = './squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
 DEF_STATE = {'pager': True, 'footer': True}
+DEF_MIN_FOOTER = '\n'
 
 URL_CRED_PATTERN = r'://(.+)@'
 URL_CRED_REPLACE = r'://***@'
@@ -323,7 +324,7 @@ Formatting
         :rtype: str
         """
 
-        footer = ''
+        footer = DEF_MIN_FOOTER
 
         if self.result.supports_sane_rowcount and self.result.rowcount != -1:
             logger.debug(f"row count available in the result cursor")
@@ -371,7 +372,7 @@ Formatting
                     table += self.get_result_table_footer(table, table_opts)
                 else:
                     # No footer, add blank line to separate table from prompt
-                    table += '\n'
+                    table += DEF_MIN_FOOTER
 
                 if self.state.get('pager'):
                     pydoc.pager(table)
