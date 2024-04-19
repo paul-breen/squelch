@@ -301,7 +301,7 @@ Formatting
         table_opts = table_opts or self.get_conf_item('table_opts')
         logger.debug(f"table_opts: {table_opts}")
 
-        if self.result:
+        if self.result and self.result.returns_rows:
             table = tabulate(self.result, headers=self.result.keys(), **table_opts)
 
             if self.state['pager']:
