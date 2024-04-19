@@ -125,6 +125,8 @@ def test_present_result(unconfigured_squelch, result, headers, state, table_opts
 
     if result is None:
         result = mocker.patch('sqlalchemy.engine.cursor.CursorResult')
+        result.returns_rows = True
+        mocker.patch.object(result, 'values', return_value=[[11,21]])
 
         if headers:
             mocker.patch.object(result, 'keys', return_value=headers)
