@@ -20,7 +20,7 @@ PROGNAME = __name__
 DEF_CONF_FILE = './squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
-DEF_STATE = {'pager': True, 'footer': True}
+DEF_STATE = {'pager': True, 'footer': True, 'AUTOCOMMIT': True}
 DEF_MIN_FOOTER = '\n'
 
 URL_CRED_PATTERN = r'://(.+)@'
@@ -160,6 +160,11 @@ class Squelch(object):
                 self.state['footer'] = False
             elif re.match(fr'\\pset footer {truthy}', cmd.lower()):
                 self.state['footer'] = True
+        elif cmd.lower().startswith(r'\set AUTOCOMMIT'):
+            if re.match(fr'\\set AUTOCOMMIT {falsy}', cmd.lower()):
+                self.state['AUTOCOMMIT'] = False
+            elif re.match(fr'\\set AUTOCOMMIT {truthy}', cmd.lower()):
+                self.state['AUTOCOMMIT'] = True
 
         return state_text
 
@@ -219,6 +224,9 @@ Help
 Formatting
   \pset [NAME [VALUE]]   set table output option
                          (pager)
+
+Variables
+  \set [NAME [VALUE]]    set internal variable, or list all if no parameters
 """
 
         return text
@@ -277,8 +285,9 @@ Formatting
         """
         Execute the given query and bind any given query parameters
 
-        The query is executed in a database transaction and the query
-        result set is stored in self.result
+        * The query result set is stored in self.result.
+        * If AUTOCOMMIT is on, the query is executed in a DB transaction
+          and automatically committed on successful execution.
 
         :param query: The query to execute
         :type query: sqlalchemy.sql.text
@@ -290,14 +299,14 @@ Formatting
 
         self.result = None
 
-        with self.conn.begin() as trans:
-            try:
-                self.result = self.conn.execute(query, params)
-            except DatabaseError as e:
-                if logger.isEnabledFor(logging.DEBUG):
-                    traceback.print_exc(chain=False)
-                else:
-                    print(e, file=sys.stderr)
+        try:
+            self.result = self.conn.execute(query, params)
+            self.state.get('AUTOCOMMIT') and self.conn.commit()
+        except DatabaseError as e:
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(chain=False)
+            else:
+                print(e, file=sys.stderr)
 
         return self.result
 
@@ -440,6 +449,33 @@ Formatting
         else:
             print(self.state)
 
+    def handle_query(self, raw):
+        """
+        Process the given query
+
+        :param raw: The raw stripped input (a query)
+        :type raw: str
+        """
+
+        cmd = raw.split()[0].lower()
+
+        # Disable autocommit during an explicit transaction
+        if cmd == 'begin':
+            self.state['AUTOCOMMIT'] = False
+            print('BEGIN')
+
+        self.query = text(raw)
+        self.params = self.prompt_for_query_params(raw)
+        self.exec_query(self.query, self.params)
+        self.present_result()
+
+        if cmd == 'rollback':
+            self.state['AUTOCOMMIT'] = True
+            print('ROLLBACK')
+        elif cmd == 'commit':
+            self.state['AUTOCOMMIT'] = True
+            print('COMMIT')
+
     def process_input(self, raw):
         """
         Process the given input
@@ -471,10 +507,7 @@ Formatting
             elif cmd in self.get_conf_item('repl_commands')['dist']:
                 print(self.get_dist_terms_text())
             else:
-                self.query = text(raw)
-                self.params = self.prompt_for_query_params(raw)
-                self.exec_query(self.query, self.params)
-                self.present_result()
+                self.handle_query(raw)
         else:
             q = input('no input, do you want to quit (yes/no)? ')
 
