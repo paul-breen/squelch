@@ -124,6 +124,18 @@ def test_exec_query_debug(unconfigured_squelch, query, params, mocker, capsys, c
     assert 'sentinel text' in captured.err
     assert 'Traceback (most recent call last)' in captured.err
 
+@pytest.mark.parametrize(['nrows','expected'], [
+(2, '\n(2 rows)\n'),
+(1, '\n(1 row)\n'),
+(0, '\n(0 rows)\n'),
+(-1, '\n'),
+(-2, '\n(-2 rows)\n'),
+])
+def test_get_table_footer_text(unconfigured_squelch, nrows, expected):
+    f = unconfigured_squelch
+    actual = f.get_table_footer_text(nrows)
+    assert actual == expected
+
 @pytest.mark.parametrize(['result','headers','state','table_opts','expected'], [
 ({}, [], {'pager': True}, None, ''),
 (None, [], {'pager': True}, None, ''),
@@ -225,6 +237,25 @@ def test_handle_state_command(unconfigured_squelch, raw, expected, capsys):
     f.handle_state_command(raw)
     captured = capsys.readouterr()
     assert expected in captured.out
+
+@pytest.mark.parametrize(['raw','expected'], [
+(r"\d", 'all'),
+(r"\dt", 'all'),
+(r"\d data", 'data'),
+(r"\dt data", 'data'),
+])
+def test_handle_metadata_command(unconfigured_squelch, raw, expected, mocker, capsys):
+    f = unconfigured_squelch
+    far = mocker.patch.object(f, 'get_metadata_table_for_all_relations', return_value=expected)
+    fr = mocker.patch.object(f, 'get_metadata_table_for_relation', return_value=expected)
+    f.handle_metadata_command(raw)
+    captured = capsys.readouterr()
+    assert expected in captured.out
+
+    if len(raw.split()) > 1:
+        fr.assert_called_once()
+    else:
+        far.assert_called_once()
 
 @pytest.mark.parametrize(['raw','query','params','autocommit'], [
 ("begin", text('begin'), {}, False),

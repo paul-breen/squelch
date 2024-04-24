@@ -10,9 +10,9 @@ import json
 import readline
 import pydoc
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.sql import text
-from sqlalchemy.exc import DatabaseError
+from sqlalchemy.exc import DatabaseError, NoSuchTableError
 from tabulate import tabulate
 
 PROGNAME = __name__
@@ -43,6 +43,7 @@ class Squelch(object):
         'repl_commands': {
             'quit': [r'\q'],
             'state': [r'\set', r'\pset'],
+            'metadata': [r'\d', r'\dt'],
             'help': [r'help', r'\?'],
             'dist': [r'\copyright']
         },
@@ -221,6 +222,11 @@ Type:  \copyright for distribution terms
 Help
   \?                     show help on backslash commands
 
+Informational
+  \d                     list tables and views
+  \d      NAME           describe table or view
+  \dt     [NAME]         list tables
+
 Formatting
   \pset [NAME [VALUE]]   set table output option
                          (pager)
@@ -310,6 +316,29 @@ Variables
 
         return self.result
 
+    def get_table_footer_text(self, nrows):
+        """
+        Get the text for a table footer
+
+        The footer text shows the row count of the table data
+
+        :param nrows: The number of rows in the table.  If nrows == -1, then
+        the footer text only consists of the minimum footer text
+        :type nrows: int
+        :returns: The table footer text
+        :rtype: str
+        """
+
+        footer = DEF_MIN_FOOTER
+
+        if nrows != -1:
+            row_text = 'row' if nrows == 1 else 'rows'
+            footer = f'\n({nrows} {row_text})\n'
+        else:
+            logger.debug(f"row count not available")
+
+        return footer
+
     def get_result_table_footer(self, table, table_opts):
         """
         Get the result table footer
@@ -333,8 +362,6 @@ Variables
         :rtype: str
         """
 
-        footer = DEF_MIN_FOOTER
-
         if self.result.supports_sane_rowcount and self.result.rowcount != -1:
             logger.debug(f"row count available in the result cursor")
             nrows = self.result.rowcount
@@ -346,13 +373,7 @@ Variables
             except KeyError:
                 nrows = -1
 
-        if nrows != -1:
-            row_text = 'row' if nrows == 1 else 'rows'
-            footer = f'\n({nrows} {row_text})\n'
-        else:
-            logger.debug(f"row count not available")
-
-        return footer
+        return self.get_table_footer_text(nrows)
 
     def get_command_response(self):
         """
@@ -476,6 +497,97 @@ Variables
         else:
             print(self.state)
 
+    def get_metadata_table_for_all_relations(self, views=True):
+        """
+        Get the table showing metadata for all relations
+
+        :param views: Include views as well as tables in the list of relations
+        :type views: bool
+        :returns: The table showing metadata for all relations
+        :rtype: str
+        """
+
+        table_opts = self.get_conf_item('table_opts')
+        md = MetaData()
+        md.reflect(bind=self.conn.engine, views=views)
+
+        table_names = [[i] for i in md.tables]
+        table_names.sort()
+        table = 'List of relations\n'
+        table += tabulate(table_names, headers=['Name'], **table_opts)
+        table += self.get_table_footer_text(len(table_names))
+
+        return table
+
+    def get_metadata_table_for_relation(self, name):
+        """
+        Get the table showing metadata for the given relation
+
+        :param name: The name of the relation
+        :type name: str
+        :returns: The table showing metadata for the given relation or None
+        if the relation doesn't exist
+        :rtype: str or None
+        """
+
+        table_opts = self.get_conf_item('table_opts')
+        md = MetaData()
+        md.reflect(bind=self.conn.engine)
+
+        try:
+            rel_md = Table(name, md, autoload_with=self.conn.engine)
+        except NoSuchTableError as e:
+            msg = f'Did not find any relation named "{e}".'
+
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(chain=False)
+            else:
+                print(msg, file=sys.stderr)
+
+            return None
+
+        cols = [[c.name,c.type,c.nullable,c.default,c.primary_key] for c in rel_md.columns]
+        idxs = [f'    "{i.name}", {",".join([c.name for c in i.expressions])}' for i in rel_md.indexes]
+        table = f'Relation "{rel_md.name}"\n'
+        table += tabulate(cols, headers=['Column','Type','Nullable','Default','Primary Key'], **table_opts)
+
+        if len(idxs) > 0:
+            table += f'\nIndexes:\n'
+            table += '\n'.join(idxs)
+
+        table += self.get_table_footer_text(-1)
+
+        return table
+
+    def handle_metadata_command(self, raw):
+        """
+        Process the given metadata introspection command
+
+        :param raw: The raw stripped input (a REPL state command)
+        :type raw: str
+        :returns: The metadata text corresponding to the given command
+        :rtype: str
+        """
+
+        table = ''
+
+        if raw.lower() == r'\d':
+            table = self.get_metadata_table_for_all_relations(views=True)
+        elif raw.lower() == r'\dt':
+            table = self.get_metadata_table_for_all_relations(views=False)
+        elif raw.lower().startswith(r'\d'):
+            args = raw.split()
+
+            if len(args) > 1:
+                name = args[1]
+                table = self.get_metadata_table_for_relation(name)
+
+        if table:
+            if self.state.get('pager'):
+                pydoc.pager(table)
+            else:
+                print(table)
+
     def handle_query(self, raw):
         """
         Process the given query
@@ -526,6 +638,8 @@ Variables
                 sys.exit(0)
             elif cmd in self.get_conf_item('repl_commands')['state']:
                 self.handle_state_command(raw)
+            elif cmd in self.get_conf_item('repl_commands')['metadata']:
+                self.handle_metadata_command(raw)
             elif cmd in self.get_conf_item('repl_commands')['help']:
                 print(self.get_help(raw))
             elif cmd in self.get_conf_item('repl_commands')['dist']:
