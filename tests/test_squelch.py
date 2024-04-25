@@ -124,6 +124,26 @@ def test_exec_query_debug(unconfigured_squelch, query, params, mocker, capsys, c
     assert 'sentinel text' in captured.err
     assert 'Traceback (most recent call last)' in captured.err
 
+@pytest.mark.parametrize(['data','state','kwargs','term_size','expected'], [
+('', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((80,24)), False),
+('short\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((80,24)), False),
+('short\nshort\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((80,24)), False),
+('short\nshort\nshort\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((80,24)), False),
+('short\nshort\nshort\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((80,4)), False),
+('short\nshort\nshort\nshort\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((80,4)), True),
+('short\nshort\nshort\nshort\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((5,24)), True),
+('short\nshort\nshort\nshort\n', {'pager': False}, {'sep': '\n', 'nsample': 2}, os.terminal_size((5,24)), False),
+('short\nshort\nshort\nreally long but wont be sampled\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((10,24)), False),
+('short\nreally long and will be sampled\nshort\nshort\n', {'pager': True}, {'sep': '\n', 'nsample': 2}, os.terminal_size((10,24)), True),
+('short\nshort\nshort\nreally long and will be sampled\n', {'pager': True}, {'sep': '\n', 'nsample': 5}, os.terminal_size((10,24)), False),
+])
+def test_use_pager(unconfigured_squelch, data, state, kwargs, term_size, expected, mocker):
+    f = unconfigured_squelch
+    f.state = state
+    mocker.patch('squelch.shutil.get_terminal_size', return_value=term_size)
+    actual = f.use_pager(data, **kwargs)
+    assert actual == expected
+
 @pytest.mark.parametrize(['nrows','expected'], [
 (2, '\n(2 rows)\n'),
 (1, '\n(1 row)\n'),
@@ -148,6 +168,7 @@ def test_present_result(unconfigured_squelch, result, headers, state, table_opts
 
     if state['pager']:
         pager = mocker.patch('pydoc.pager')
+        use_pager = mocker.patch.object(f, 'use_pager', return_value=state['pager'])
 
     if result is None:
         result = mocker.patch('sqlalchemy.engine.cursor.CursorResult')
@@ -163,6 +184,7 @@ def test_present_result(unconfigured_squelch, result, headers, state, table_opts
 
     if result:
         if state['pager']:
+            use_pager.assert_called_once()
             pager.assert_called_once()
         else:
             captured = capsys.readouterr()

@@ -9,6 +9,7 @@ import re
 import json
 import readline
 import pydoc
+import shutil
 
 from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.sql import text
@@ -316,6 +317,61 @@ Variables
 
         return self.result
 
+    def use_pager(self, data, sep='\n', nsample=2):
+        """
+        Determine whether we should use the pager or not
+
+        We sample the first few lines of data.  Table grid lines are usually
+        the longest lines and so we try to use this to determine if the
+        output is wider than the terminal.  To turn this off, set sample=-1,
+        which will mean we just check the length of the first line
+
+        :param data: The data to be output
+        :type data: str
+        :param sep: The separator string of the lines in data
+        :type sep: str
+        :param nsample: The number of lines to sample from data to find the
+        longest line length
+        :type nsample: int
+        :returns: A flag indicating whether to use the pager or not
+        :rtype: bool
+        """
+
+        use_pager = False
+
+        if self.state.get('pager'):
+            ts = shutil.get_terminal_size()
+            nlines = data.count(sep)
+
+            if nsample != -1 and nlines >= nsample:
+                sample_lines = data.split(sep, maxsplit=nsample)
+                ncolumns = max([len(i) for i in sample_lines[0:nsample]])
+            else:
+                ncolumns = data.find(sep)
+
+            if nlines < ts.lines and ncolumns < ts.columns:
+                use_pager = False
+            else:
+                use_pager = True
+
+        return use_pager
+
+    def print_data(self, data):
+        """
+        Print the given data to stdout
+
+        The output is paged if the pager state variable is set and the data
+        would overflow the terminal
+
+        :param data: The data to be output
+        :type data: str
+        """
+
+        if self.use_pager(data):
+            pydoc.pager(data)
+        else:
+            print(data)
+
     def get_table_footer_text(self, nrows):
         """
         Get the text for a table footer
@@ -429,10 +485,7 @@ Variables
                     else:
                         table += DEF_MIN_FOOTER
 
-                    if self.state.get('pager'):
-                        pydoc.pager(table)
-                    else:
-                        print(table)
+                    self.print_data(table)
             else:
                 print(self.get_command_response())
 
@@ -583,10 +636,7 @@ Variables
                 table = self.get_metadata_table_for_relation(name)
 
         if table:
-            if self.state.get('pager'):
-                pydoc.pager(table)
-            else:
-                print(table)
+            self.print_data(table)
 
     def handle_query(self, raw):
         """
