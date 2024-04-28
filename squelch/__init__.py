@@ -360,7 +360,7 @@ Variables
         """
         Print the given data to stdout
 
-        The output is paged if the pager state variable is set and the data
+        The output is paged if the 'pager' state variable is set and the data
         would overflow the terminal
 
         :param data: The data to be output
@@ -378,6 +378,9 @@ Variables
 
         The footer text shows the row count of the table data
 
+        * If the state variable 'footer' is False, the only the minimum footer
+          is returned
+
         :param nrows: The number of rows in the table.  If nrows == -1, then
         the footer text only consists of the minimum footer text
         :type nrows: int
@@ -387,11 +390,10 @@ Variables
 
         footer = DEF_MIN_FOOTER
 
-        if nrows != -1:
-            row_text = 'row' if nrows == 1 else 'rows'
-            footer = f'\n({nrows} {row_text})\n'
-        else:
-            logger.debug(f"row count not available")
+        if self.state.get('footer'):
+            if nrows != -1:
+                row_text = 'row' if nrows == 1 else 'rows'
+                footer = f'\n({nrows} {row_text})\n'
 
         return footer
 
@@ -418,6 +420,8 @@ Variables
         :rtype: str
         """
 
+        nrows = -1
+
         if self.result.supports_sane_rowcount and self.result.rowcount != -1:
             logger.debug(f"row count available in the result cursor")
             nrows = self.result.rowcount
@@ -428,6 +432,9 @@ Variables
                     nrows = table.count('\n') - 1
             except KeyError:
                 nrows = -1
+
+        if nrows == -1:
+            logger.debug(f"row count not available")
 
         return self.get_table_footer_text(nrows)
 
@@ -480,11 +487,7 @@ Variables
                 table = tabulate(self.result, headers=self.result.keys(), **table_opts)
 
                 if table:
-                    if self.state.get('footer'):
-                        table += self.get_result_table_footer(table, table_opts)
-                    else:
-                        table += DEF_MIN_FOOTER
-
+                    table += self.get_result_table_footer(table, table_opts)
                     self.print_data(table)
             else:
                 print(self.get_command_response())
