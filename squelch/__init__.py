@@ -47,7 +47,7 @@ class Squelch(object):
         'repl_commands': {
             'quit': [r'\q'],
             'state': [r'\set', r'\pset'],
-            'metadata': [r'\d', r'\dt', r'\dv', r'\ds'],
+            'metadata': [r'\d', r'\dt', r'\dv', r'\ds', r'\di'],
             'help': [r'help', r'\?'],
             'dist': [r'\copyright']
         },
@@ -575,7 +575,6 @@ Variables
 
         try:
             rel_names = func()
-            rel_names.sort()
         except NotImplementedError as e:
             if logger.isEnabledFor(logging.INFO):
                 warnings.warn(f"Engine does not provide a list of {type_name} names")
@@ -645,14 +644,20 @@ Variables
 
         table_opts = self.get_conf_item('table_opts')
         insp = inspect(self.conn.engine)
+        headers = ['Name','Type']
         rel_names = []
 
         for type_name in types:
-            rel_names += [[i, type_name] for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
+            if type_name == 'index':
+                res = self._get_relation_type_names(insp.get_multi_indexes, type_name)
+                rel_names += [[v['name'], type_name, k[1]] for k in res for v in res[k]]
+                headers = ['Name','Type','Table']
+            else:
+                rel_names += [[i, type_name] for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
 
         rel_names.sort()
         table = 'List of relations\n'
-        table += tabulate(rel_names, headers=['Name','Type'], **table_opts)
+        table += tabulate(rel_names, headers=headers, **table_opts)
         table += self.get_table_footer_text(len(rel_names))
 
         return table
@@ -706,6 +711,8 @@ Variables
             table = self.get_metadata_table_for_relation_types(types=['view'])
         elif raw.lower() == r'\ds':
             table = self.get_metadata_table_for_relation_types(types=['sequence'])
+        elif raw.lower() == r'\di':
+            table = self.get_metadata_table_for_relation_types(types=['index'])
         elif raw.lower().startswith(r'\d'):
             args = raw.split()
 
