@@ -263,21 +263,28 @@ def test_handle_state_command(unconfigured_squelch, raw, expected, capsys):
 @pytest.mark.parametrize(['raw','expected'], [
 (r"\d", 'all'),
 (r"\dt", 'all'),
+(r"\dv", 'all'),
+(r"\ds", 'all'),
+(r"\ddummy", ''),
 (r"\d data", 'data'),
 (r"\dt data", 'data'),
+(r"\dv data", 'data'),
+(r"\ds data", 'data'),
+(r"\ddummy data", ''),
 ])
 def test_handle_metadata_command(unconfigured_squelch, raw, expected, mocker, capsys):
     f = unconfigured_squelch
-    far = mocker.patch.object(f, 'get_metadata_table_for_all_relations', return_value=expected)
+    far = mocker.patch.object(f, 'get_metadata_table_for_relation_types', return_value=expected)
     fr = mocker.patch.object(f, 'get_metadata_table_for_relation', return_value=expected)
     f.handle_metadata_command(raw)
     captured = capsys.readouterr()
     assert expected in captured.out
 
-    if len(raw.split()) > 1:
-        fr.assert_called_once()
-    else:
-        far.assert_called_once()
+    if expected != '':
+        if len(raw.split()) > 1:
+            fr.assert_called_once()
+        else:
+            far.assert_called_once()
 
 @pytest.mark.parametrize(['raw','query','params','autocommit'], [
 ("begin", text('begin'), {}, False),
@@ -370,6 +377,7 @@ def test_input_completions(unconfigured_squelch, text, state, expected):
 def test_init_repl(unconfigured_squelch, history_file, exists, mocker):
     f = unconfigured_squelch
     f.conf['history_file'] = history_file
+    mocker.patch.object(f, 'get_relation_names', return_value=[])
     wh = mocker.patch('readline.write_history_file')
     rh = mocker.patch('readline.read_history_file')
     pb = mocker.patch('readline.parse_and_bind')

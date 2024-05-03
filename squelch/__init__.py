@@ -10,8 +10,9 @@ import json
 import readline
 import pydoc
 import shutil
+import warnings
 
-from sqlalchemy import create_engine, MetaData, Table
+from sqlalchemy import create_engine, MetaData, Table, inspect
 from sqlalchemy.sql import text
 from sqlalchemy.exc import DatabaseError, NoSuchTableError
 from tabulate import tabulate
@@ -29,6 +30,8 @@ URL_CRED_REPLACE = r'://***@'
 
 SQL_COMPLETIONS = ['select', 'insert', 'update', 'delete', 'create', 'drop', 'from', 'where', 'and', 'or', 'not', 'like', 'order by', 'group by', 'into', 'values','begin', 'transaction', 'commit', 'rollback']
 
+DEF_REL_TYPES = ['table','view','sequence']
+
 logger = logging.getLogger(__name__)
 
 class Squelch(object):
@@ -44,7 +47,7 @@ class Squelch(object):
         'repl_commands': {
             'quit': [r'\q'],
             'state': [r'\set', r'\pset'],
-            'metadata': [r'\d', r'\dt'],
+            'metadata': [r'\d', r'\dt', r'\dv', r'\ds'],
             'help': [r'help', r'\?'],
             'dist': [r'\copyright']
         },
@@ -71,6 +74,7 @@ class Squelch(object):
         self.query = None
         self.params = {}
         self.result = None
+        self.completions = SQL_COMPLETIONS
 
     def get_conf(self, file=DEF_CONF_FILE):
         """
@@ -224,9 +228,11 @@ Help
   \?                     show help on backslash commands
 
 Informational
-  \d                     list tables and views
+  \d                     list tables, views, and sequences
   \d      NAME           describe table or view
+  \ds     [NAME]         list sequences
   \dt     [NAME]         list tables
+  \dv     [NAME]         list views
 
 Formatting
   \pset [NAME [VALUE]]   set table output option
@@ -553,25 +559,101 @@ Variables
         else:
             print(self.state)
 
-    def get_metadata_table_for_all_relations(self, views=True):
+    def _get_relation_type_names(self, func, type_name):
         """
-        Get the table showing metadata for all relations
+        Get a list of relation names of the given type
 
-        :param views: Include views as well as tables in the list of relations
-        :type views: bool
-        :returns: The table showing metadata for all relations
+        :param func: The function to provide the list of relation names
+        :type func: function reference
+        :param type_name: The name of the relation type
+        :type type_name: str
+        :returns: A list of relation names
+        :rtype: list
+        """
+
+        rel_names = []
+
+        try:
+            rel_names = func()
+            rel_names.sort()
+        except NotImplementedError as e:
+            if logger.isEnabledFor(logging.INFO):
+                warnings.warn(f"Engine does not provide a list of {type_name} names")
+
+        return rel_names
+
+    def get_relation_names(self, types=DEF_REL_TYPES):
+        """
+        Get a list of relation names for the given relation types
+
+        :param types: Include types in the list of relations
+        :type types: list
+        :returns: A list of relation names for the given relation types
+        :rtype: list
+        """
+
+        # Using the Inspector for introspection is much faster than using
+        # MetaData.  Hence, even though it means pulling in more functionality
+        # from SQLAlchemy (we have to use MetaData for table metadata), it is
+        # worth it
+        insp = inspect(self.conn.engine)
+        rel_names = []
+
+        for type_name in types:
+            rel_names += [i for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
+
+        rel_names.sort()
+
+        return rel_names
+
+    def get_metadata_for_relation(self, name):
+        """
+        Get the metadata object for the given relation
+
+        :param name: The name of the relation
+        :type name: str
+        :returns: The relation metadata object or None if the relation
+        doesn't exist
+        :rtype: sqlalchemy.schema.Table or None
+        """
+
+        rel_md = None
+        md = MetaData()
+        md.reflect(bind=self.conn.engine)
+
+        try:
+            rel_md = Table(name, md, autoload_with=self.conn.engine)
+        except NoSuchTableError as e:
+            msg = f'Did not find any relation named "{e}".'
+
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(chain=False)
+            else:
+                print(msg, file=sys.stderr)
+
+        return rel_md
+
+    def get_metadata_table_for_relation_types(self, types=DEF_REL_TYPES):
+        """
+        Get the table showing metadata for the given relation types
+
+        :param types: Include types in the list of relations
+        :type types: list
+        :returns: The table showing metadata for the given relation types
         :rtype: str
         """
 
         table_opts = self.get_conf_item('table_opts')
-        md = MetaData()
-        md.reflect(bind=self.conn.engine, views=views)
+        insp = inspect(self.conn.engine)
+        rel_names = []
 
-        table_names = [[i] for i in md.tables]
-        table_names.sort()
+        for type_name in types:
+            rel_names += [[i, type_name] for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
+
+        rel_names.sort()
         table = 'List of relations\n'
-        table += tabulate(table_names, headers=['Name'], **table_opts)
-        table += self.get_table_footer_text(len(table_names))
+        table += tabulate(rel_names, headers=['Name','Type'], **table_opts)
+        table += self.get_table_footer_text(len(rel_names))
 
         return table
 
@@ -586,32 +668,21 @@ Variables
         :rtype: str or None
         """
 
+        table = None
         table_opts = self.get_conf_item('table_opts')
-        md = MetaData()
-        md.reflect(bind=self.conn.engine)
+        rel_md = self.get_metadata_for_relation(name)
 
-        try:
-            rel_md = Table(name, md, autoload_with=self.conn.engine)
-        except NoSuchTableError as e:
-            msg = f'Did not find any relation named "{e}".'
+        if rel_md is not None:
+            cols = [[c.name,c.type,c.nullable,c.default,c.primary_key] for c in rel_md.columns]
+            idxs = [f'    "{i.name}", {",".join([c.name for c in i.expressions])}' for i in rel_md.indexes]
+            table = f'Relation "{rel_md.name}"\n'
+            table += tabulate(cols, headers=['Column','Type','Nullable','Default','Primary Key'], **table_opts)
 
-            if logger.isEnabledFor(logging.DEBUG):
-                traceback.print_exc(chain=False)
-            else:
-                print(msg, file=sys.stderr)
+            if len(idxs) > 0:
+                table += f'\nIndexes:\n'
+                table += '\n'.join(idxs)
 
-            return None
-
-        cols = [[c.name,c.type,c.nullable,c.default,c.primary_key] for c in rel_md.columns]
-        idxs = [f'    "{i.name}", {",".join([c.name for c in i.expressions])}' for i in rel_md.indexes]
-        table = f'Relation "{rel_md.name}"\n'
-        table += tabulate(cols, headers=['Column','Type','Nullable','Default','Primary Key'], **table_opts)
-
-        if len(idxs) > 0:
-            table += f'\nIndexes:\n'
-            table += '\n'.join(idxs)
-
-        table += self.get_table_footer_text(-1)
+            table += self.get_table_footer_text(-1)
 
         return table
 
@@ -628,9 +699,13 @@ Variables
         table = ''
 
         if raw.lower() == r'\d':
-            table = self.get_metadata_table_for_all_relations(views=True)
+            table = self.get_metadata_table_for_relation_types()
         elif raw.lower() == r'\dt':
-            table = self.get_metadata_table_for_all_relations(views=False)
+            table = self.get_metadata_table_for_relation_types(types=['table'])
+        elif raw.lower() == r'\dv':
+            table = self.get_metadata_table_for_relation_types(types=['view'])
+        elif raw.lower() == r'\ds':
+            table = self.get_metadata_table_for_relation_types(types=['sequence'])
         elif raw.lower().startswith(r'\d'):
             args = raw.split()
 
@@ -723,7 +798,7 @@ Variables
         if not text:
             matches = SQL_COMPLETIONS
         else:
-            matches = [i for i in SQL_COMPLETIONS if i.startswith(text.lower())] + [None]
+            matches = [i for i in self.completions if i.startswith(text.lower())] + [None]
 
         return matches[state]
 
@@ -745,6 +820,7 @@ Variables
         readline.read_history_file(history_file)
 
         logger.info(f"setting input completions")
+        self.completions = SQL_COMPLETIONS + self.get_relation_names()
         readline.parse_and_bind("tab: complete")
         readline.set_completer(self.input_completions)
 
