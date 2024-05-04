@@ -525,6 +525,21 @@ Variables
 
         return self.params
 
+    def clean_raw_input(self, raw, terminator=';'):
+        """
+        Clean the raw input query
+
+        :param terminator: A query terminator to be stripped from the query
+        :type terminator: str
+        :returns: The raw stripped query
+        :rtype: str
+        """
+
+        raw = raw.strip().rstrip(terminator)
+        logger.debug(f"raw stripped query: '{raw}'")
+
+        return raw
+
     def prompt_for_input(self, prompt='=> ', terminator=';'):
         """
         Prompt for input
@@ -540,11 +555,7 @@ Variables
         :rtype: str
         """
 
-        raw = input(prompt)
-        raw = raw.strip().rstrip(terminator)
-        logger.debug(f"raw stripped query: '{raw}'")
-
-        return raw
+        return self.clean_raw_input(input(prompt), terminator=terminator)
 
     def handle_state_command(self, raw):
         """

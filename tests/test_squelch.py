@@ -208,7 +208,8 @@ def test_prompt_for_query_params(unconfigured_squelch, raw, values, expected, mo
     f.prompt_for_query_params(raw)
     assert f.params == expected
 
-@pytest.mark.parametrize(['value','expected','terminator'], [
+# These parameters are shared across multiple tests
+raw_input_params = pytest.mark.parametrize(['raw','expected','terminator'], [
 ("select * from data", "select * from data", ';'),
 ("select * from data where id = :id", "select * from data where id = :id", ';'),
 ("select * from data  ", "select * from data", ';'),
@@ -226,9 +227,17 @@ def test_prompt_for_query_params(unconfigured_squelch, raw, values, expected, mo
 (r"select * from data where id = :id\\", "select * from data where id = :id", r'\\'),
 ("select * from data where id = :id%", "select * from data where id = :id", '%'),
 ])
-def test_prompt_for_input(unconfigured_squelch, value, expected, terminator, mocker):
+
+@raw_input_params
+def test_clean_raw_input(unconfigured_squelch, raw, expected, terminator):
     f = unconfigured_squelch
-    mocker.patch('squelch.input', return_value=value)
+    actual = f.clean_raw_input(raw, terminator=terminator)
+    assert actual == expected
+
+@raw_input_params
+def test_prompt_for_input(unconfigured_squelch, raw, expected, terminator, mocker):
+    f = unconfigured_squelch
+    mocker.patch('squelch.input', return_value=raw)
     actual = f.prompt_for_input(terminator=terminator)
     assert actual == expected
 
