@@ -4,6 +4,9 @@ import logging
 
 from squelch import Squelch, __version__, PROGNAME, DEF_CONF_FILE
 
+STATE_OPTS = ['set','pset']
+NON_CONF_OPTS = STATE_OPTS
+
 logging.basicConfig()
 logger = logging.getLogger(PROGNAME)
 
@@ -31,6 +34,8 @@ From the SQLAlchemy documentation:
     parser = argparse.ArgumentParser(description='Squelch is a Simple SQL REPL Command Handler.', epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter, prog=PROGNAME)
     parser.add_argument('-c', '--conf-file', help=f"The full path to a JSON configuration file.  It defaults to {DEF_CONF_FILE}.")
     parser.add_argument('-u', '--url', help='The database connection URL, as required by sqlalchemy.create_engine().')
+    parser.add_argument('-S', '--set', help='Set state variable NAME to VALUE.', metavar='NAME=VALUE')
+    parser.add_argument('-P', '--pset', help='Set printing state variable NAME to VALUE.', metavar='NAME=VALUE')
     parser.add_argument('-v', '--verbose', help='Turn verbose messaging on.  The effects of this option are incremental.', action='count', default=0)
     parser.add_argument('-V', '--version', action='version', version=f"%(prog)s {__version__}")
 
@@ -64,6 +69,8 @@ def update_conf_from_cmdln(conf, args):
     """
     Update the configuration from command line arguments
 
+    Options listed in NON_CONF_OPTS are not included in the configuration
+
     :param conf: The program's configuration
     :type conf: dict
     :param args: The parsed command line arguments object
@@ -75,13 +82,49 @@ def update_conf_from_cmdln(conf, args):
     opts = {}
 
     for k,v in vars(args).items():
-        if v:
-            opts[k] = v
+        if k not in NON_CONF_OPTS:
+            if v:
+                opts[k] = v
 
     logger.debug(f"overriding configuration with options: {opts}")
     conf.update(opts)
 
     return conf
+
+def set_state_from_cmdln(squelch, args, nv_sep='='):
+    """
+    Update the program's runtime state from command line arguments
+
+    Options listed in STATE_OPTS are used to set the program's runtime state
+
+    :param squelch: The instantiated Squelch object
+    :type squelch: Squelch
+    :param args: The parsed command line arguments object
+    :type args: argparse.Namespace object
+    :param nv_sep: The name/value separator in the option argument
+    :type nv_sep: str
+    """
+
+    for k,v in vars(args).items():
+        if k in STATE_OPTS:
+            if v:
+                try:
+                    name, value = v.split(nv_sep, maxsplit=2)
+                except ValueError as e:
+                    print(f"A state variable must be expressed as NAME=VALUE.  For example, --set AUTOCOMMIT=on, --pset pager=off.", file=sys.stderr)
+
+                    if args.verbose > 1:
+                        raise
+                    else:
+                        sys.exit(1)
+
+                # Construct command in form it would be issued in client
+                logger.debug(f"setting {name} to {value}")
+                cmd = fr"\{k} {name} {value}"
+                state_text = squelch.set_state(cmd)
+
+                if state_text:
+                    logger.debug(state_text)
 
 def consolidate_conf(squelch, args):
     """
@@ -89,8 +132,8 @@ def consolidate_conf(squelch, args):
 
     :param squelch: The instantiated Squelch object
     :type squelch: Squelch
-    :param args: The parsed command line arguments squelchect
-    :type args: argparse.Namespace squelchect
+    :param args: The parsed command line arguments object
+    :type args: argparse.Namespace object
     :returns: The consolidated configuration
     :rtype: dict
     """
@@ -108,6 +151,8 @@ def consolidate_conf(squelch, args):
         pass
 
     configure_logging(args)
+
+    set_state_from_cmdln(squelch, args)
 
     return squelch.conf
 
