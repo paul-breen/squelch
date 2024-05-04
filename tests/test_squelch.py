@@ -80,6 +80,10 @@ def test_get_conf_item_error(unconfigured_squelch, conf, key, expected):
 ({'pager': True}, 'pager', r'\pset pager 0', False),
 ({'pager': False}, 'pager', r'\pset pager true', True),
 ({'pager': False}, 'pager', r'\pset pager 1', True),
+({'AUTOCOMMIT': True}, 'AUTOCOMMIT', r'\set AUTOCOMMIT on', True),
+({'AUTOCOMMIT': True}, 'AUTOCOMMIT', r'\set AUTOCOMMIT off', False),
+({'AUTOCOMMIT': False}, 'AUTOCOMMIT', r'\set AUTOCOMMIT on', True),
+({'AUTOCOMMIT': True}, 'AUTOCOMMIT', r'\set autocommit off', False),
 ])
 def test_set_state(unconfigured_squelch, state, key, cmd, expected):
     f = unconfigured_squelch
