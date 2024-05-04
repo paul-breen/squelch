@@ -35,7 +35,8 @@ where the `<URL>` follows the [SQLAlchemy database connection URL syntax](https:
 ### Command line usage
 
 ```
-usage: squelch [-h] [-c CONF_FILE] [-u URL] [-v] [-V]
+usage: squelch [-h] [-c CONF_FILE] [-u URL] [-S NAME=VALUE] [-P NAME=VALUE]
+               [-v] [-V]
 
 Squelch is a Simple SQL REPL Command Handler.
 
@@ -46,6 +47,10 @@ optional arguments:
                         defaults to ./squelch.json.
   -u URL, --url URL     The database connection URL, as required by
                         sqlalchemy.create_engine().
+  -S NAME=VALUE, --set NAME=VALUE
+                        Set state variable NAME to VALUE.
+  -P NAME=VALUE, --pset NAME=VALUE
+                        Set printing state variable NAME to VALUE.
   -v, --verbose         Turn verbose messaging on. The effects of this option
                         are incremental.
   -V, --version         show program's version number and exit
