@@ -191,7 +191,14 @@ def main():
     consolidate_conf(squelch, args)
 
     connect(squelch, args)
-    squelch.repl()
+
+    # Process queries on stdin if we were called as a one-shot, otherwise
+    # we drop into the interactive REPL
+    if not sys.stdin.isatty():
+        for line in sys.stdin:
+            squelch.process_input(squelch.clean_raw_input(line))
+    else:
+        squelch.repl()
 
 if __name__ == '__main__':
     main()
