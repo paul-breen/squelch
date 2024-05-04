@@ -154,6 +154,9 @@ class Squelch(object):
         falsy = r'(off|false|0|no)'
         truthy = r'(on|true|1|yes)'
 
+        # Irrespective of the actual case of the state variable, we always
+        # compare case-insensitively for ease of the user.  No two state
+        # variable names should only differ by case, so this is quite safe
         if cmd.lower().startswith(r'\pset pager'):
             if re.match(fr'\\pset pager {falsy}', cmd.lower()):
                 self.state['pager'] = False
@@ -166,10 +169,10 @@ class Squelch(object):
                 self.state['footer'] = False
             elif re.match(fr'\\pset footer {truthy}', cmd.lower()):
                 self.state['footer'] = True
-        elif cmd.lower().startswith(r'\set AUTOCOMMIT'):
-            if re.match(fr'\\set AUTOCOMMIT {falsy}', cmd.lower()):
+        elif cmd.lower().startswith(r'\set autocommit'):
+            if re.match(fr'\\set autocommit {falsy}', cmd.lower()):
                 self.state['AUTOCOMMIT'] = False
-            elif re.match(fr'\\set AUTOCOMMIT {truthy}', cmd.lower()):
+            elif re.match(fr'\\set autocommit {truthy}', cmd.lower()):
                 self.state['AUTOCOMMIT'] = True
 
         return state_text
@@ -648,7 +651,7 @@ Variables
         rel_names = []
 
         for type_name in types:
-            if type_name == 'index':
+            if type_name.lower() == 'index':
                 res = self._get_relation_type_names(insp.get_multi_indexes, type_name)
                 rel_names += [[v['name'], type_name, k[1]] for k in res for v in res[k]]
                 headers = ['Name','Type','Table']
