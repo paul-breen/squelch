@@ -163,7 +163,7 @@ class Squelch(object):
                 state_text = 'Pager usage is off.'
             elif re.match(fr'\\pset pager {truthy}', cmd.lower()):
                 self.state['pager'] = True
-                state_text = 'Pager usage is on.'
+                state_text = 'Pager is used for long output.'
         elif cmd.lower().startswith(r'\pset footer'):
             if re.match(fr'\\pset footer {falsy}', cmd.lower()):
                 self.state['footer'] = False

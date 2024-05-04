@@ -251,7 +251,7 @@ def test_process_input_query(unconfigured_squelch, raw, query, params, mocker):
 ("select * from data", ''),
 ("0", ''),
 (r"\pset", None),
-(r"\pset pager on", 'Pager usage is on.'),
+(r"\pset pager on", 'Pager is used for long output.'),
 (r"\pset pager off", 'Pager usage is off.'),
 ])
 def test_handle_state_command(unconfigured_squelch, raw, expected, capsys):
