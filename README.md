@@ -89,8 +89,8 @@ $ python -m squelch -c tests/data/test.json < tests/data/queries.sql
 ### Command line usage
 
 ```
-usage: squelch [-h] [-c CONF_FILE] [-u URL] [-S NAME=VALUE] [-P NAME=VALUE]
-               [-v] [-V]
+usage: squelch [-h] [-c CONF_FILE] [-u URL] [-S [NAME=VALUE [NAME=VALUE ...]]]
+               [-P [NAME=VALUE [NAME=VALUE ...]]] [-v] [-V]
 
 Squelch is a Simple SQL REPL Command Handler.
 
@@ -101,9 +101,9 @@ optional arguments:
                         defaults to ./squelch.json.
   -u URL, --url URL     The database connection URL, as required by
                         sqlalchemy.create_engine().
-  -S NAME=VALUE, --set NAME=VALUE
+  -S [NAME=VALUE [NAME=VALUE ...]], --set [NAME=VALUE [NAME=VALUE ...]]
                         Set state variable NAME to VALUE.
-  -P NAME=VALUE, --pset NAME=VALUE
+  -P [NAME=VALUE [NAME=VALUE ...]], --pset [NAME=VALUE [NAME=VALUE ...]]
                         Set printing state variable NAME to VALUE.
   -v, --verbose         Turn verbose messaging on. The effects of this option
                         are incremental.
