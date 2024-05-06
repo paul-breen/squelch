@@ -26,7 +26,7 @@ def unconfigured_squelch(init_squelch):
     return f
 
 def test_version():
-    assert squelch.__version__ == '0.2.0'
+    assert squelch.__version__ == '0.3.0'
 
 @pytest.mark.parametrize(['file','expected'], [
 ('non-existent.json', {}),
