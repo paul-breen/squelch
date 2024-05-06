@@ -51,6 +51,7 @@ def test_update_conf_from_cmdln(unconfigured_squelch, argv, expected):
 (['main', '--pset', 'pager=off'], {'pager': False}),
 (['main', '--pset', 'PAGER=ON'], {'pager': True}),
 (['main', '--pset', 'footer=false'], {'footer': False}),
+(['main', '--pset', 'footer=off', '--pset', 'pager=off'], {'footer': False, 'pager': False}),
 ])
 def test_set_state_from_cmdln(unconfigured_squelch, argv, changes):
     f = unconfigured_squelch

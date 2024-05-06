@@ -34,8 +34,8 @@ From the SQLAlchemy documentation:
     parser = argparse.ArgumentParser(description='Squelch is a Simple SQL REPL Command Handler.', epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter, prog=PROGNAME)
     parser.add_argument('-c', '--conf-file', help=f"The full path to a JSON configuration file.  It defaults to {DEF_CONF_FILE}.")
     parser.add_argument('-u', '--url', help='The database connection URL, as required by sqlalchemy.create_engine().')
-    parser.add_argument('-S', '--set', help='Set state variable NAME to VALUE.', metavar='NAME=VALUE')
-    parser.add_argument('-P', '--pset', help='Set printing state variable NAME to VALUE.', metavar='NAME=VALUE')
+    parser.add_argument('-S', '--set', help='Set state variable NAME to VALUE.', metavar='NAME=VALUE', nargs='*', action='extend')
+    parser.add_argument('-P', '--pset', help='Set printing state variable NAME to VALUE.', metavar='NAME=VALUE', nargs='*', action='extend')
     parser.add_argument('-v', '--verbose', help='Turn verbose messaging on.  The effects of this option are incremental.', action='count', default=0)
     parser.add_argument('-V', '--version', action='version', version=f"%(prog)s {__version__}")
 
@@ -108,23 +108,25 @@ def set_state_from_cmdln(squelch, args, nv_sep='='):
     for k,v in vars(args).items():
         if k in STATE_OPTS:
             if v:
-                try:
-                    name, value = v.split(nv_sep, maxsplit=2)
-                except ValueError as e:
-                    print(f"A state variable must be expressed as NAME=VALUE.  For example, --set AUTOCOMMIT=on, --pset pager=off.", file=sys.stderr)
+                # Multiple state options can be set hence this is a list
+                for nv_pair in v:
+                    try:
+                        name, value = nv_pair.split(nv_sep, maxsplit=2)
+                    except ValueError as e:
+                        print(f"A state variable must be expressed as NAME=VALUE.  For example, --set AUTOCOMMIT=on, --pset pager=off.", file=sys.stderr)
 
-                    if args.verbose > 1:
-                        raise
-                    else:
-                        sys.exit(1)
+                        if args.verbose > 1:
+                            raise
+                        else:
+                            sys.exit(1)
 
-                # Construct command in form it would be issued in client
-                logger.debug(f"setting {name} to {value}")
-                cmd = fr"\{k} {name} {value}"
-                state_text = squelch.set_state(cmd)
+                    # Construct command in form it would be issued in client
+                    logger.debug(f"setting {name} to {value}")
+                    cmd = fr"\{k} {name} {value}"
+                    state_text = squelch.set_state(cmd)
 
-                if state_text:
-                    logger.debug(state_text)
+                    if state_text:
+                        logger.debug(state_text)
 
 def consolidate_conf(squelch, args):
     """
