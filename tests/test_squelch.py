@@ -69,6 +69,24 @@ def test_get_conf_item_error(unconfigured_squelch, conf, key, expected):
     with pytest.raises(KeyError) as e:
         actual = f.get_conf_item(key)
 
+@pytest.mark.parametrize(['opts','changes'], [
+({}, {}),
+({'tablefmt': squelch.DEF_TABLE_FORMAT}, {}),
+({'tablefmt': 'html'}, {'tablefmt': 'html'}),
+({'tablefmt': 'aligned'}, {'tablefmt': squelch.TABLE_FORMAT_ALIASES['aligned']}),
+({'tablefmt': 'unaligned'}, {'tablefmt': squelch.TABLE_FORMAT_ALIASES['unaligned'], 'stralign': None}),
+({'tablefmt': 'csv'}, {'tablefmt': squelch.TABLE_FORMAT_ALIASES['csv'], 'stralign': None}),
+({'showindex': True}, {'showindex': True}),
+({'disable_numparse': True}, {'disable_numparse': True}),
+])
+def test_set_table_opts(unconfigured_squelch, opts, changes):
+    f = unconfigured_squelch
+    expected = f.DEFAULTS['table_opts'].copy()
+    expected.update(changes)
+    f.set_table_opts(**opts)
+    actual = f.conf['table_opts']
+    assert actual == expected
+
 @pytest.mark.parametrize(['state','key','cmd','expected'], [
 ({'pager': True}, 'pager', r'\pset pager off', False),
 ({'pager': False}, 'pager', r'\pset pager off', False),

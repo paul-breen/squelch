@@ -15,14 +15,15 @@ import warnings
 from sqlalchemy import create_engine, MetaData, Table, inspect
 from sqlalchemy.sql import text
 from sqlalchemy.exc import DatabaseError, NoSuchTableError
-from tabulate import tabulate
+from tabulate import tabulate, simple_separated_format
 
 PROGNAME = __name__
 
+DEF_TABLE_FORMAT = 'presto'
 DEF_CONF_FILE = './squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
-DEF_STATE = {'pager': True, 'footer': True, 'AUTOCOMMIT': True}
+DEF_STATE = {'pager': True, 'footer': True, 'format': DEF_TABLE_FORMAT, 'AUTOCOMMIT': True}
 DEF_MIN_FOOTER = '\n'             # Blank line to separate table from prompt
 
 URL_CRED_PATTERN = r'://(.+)@'
@@ -30,7 +31,10 @@ URL_CRED_REPLACE = r'://***@'
 
 SQL_COMPLETIONS = ['select', 'insert', 'update', 'delete', 'create', 'drop', 'from', 'where', 'and', 'or', 'not', 'like', 'order by', 'group by', 'into', 'values','begin', 'transaction', 'commit', 'rollback']
 
-DEF_REL_TYPES = ['table','view','sequence']
+DEF_REL_TYPES = ['table', 'view', 'sequence']
+
+TABLE_FORMAT_ALIASES = {'aligned': DEF_TABLE_FORMAT, 'unaligned': simple_separated_format('|'), 'csv': simple_separated_format(',')}
+UNALIGNED_TABLE_FORMATS = ['unaligned', 'csv']
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +58,7 @@ class Squelch(object):
         'table_opts': {
             # Unfortunately, tabulate doesn't recognise a sqlalchemy result
             # as having keys(), so we can't set 'headers': 'keys' here
-            'tablefmt': 'presto', 'showindex': False, 'disable_numparse': True
+            'tablefmt': DEF_TABLE_FORMAT, 'showindex': False, 'disable_numparse': True
         }
     }
  
@@ -138,6 +142,37 @@ class Squelch(object):
         # do: self.conf.get(key, self.DEFAULTS[key])
         return self.conf[key] if key in self.conf else self.DEFAULTS[key]
 
+    def set_table_opts(self, **opts):
+        """
+        Set the progam's table formatting options
+
+        The table_opts are updated in self.conf or added if they don't exist
+
+        :param opts: Keyword args that correspond to members of the table_opts
+        dict
+        :type opts: dict
+        """
+
+        # Ensure we update table_opts from self.conf and not self.DEFAULTS
+        if 'table_opts' not in self.conf:
+            self.conf['table_opts'] = self.DEFAULTS['table_opts'].copy()
+
+        # Handle some specific table format cases
+        if 'tablefmt' in opts:
+            # For an unaligned table we have to set the alignment to None,
+            # but for an aligned table we just remove any alignment option
+            # so that it's done automatically
+            if opts['tablefmt'] in UNALIGNED_TABLE_FORMATS:
+                opts['stralign'] = None
+            else:
+                opts.pop('stralign', None)
+                self.conf['table_opts'].pop('stralign', None)
+
+            if opts['tablefmt'] in TABLE_FORMAT_ALIASES:
+                opts['tablefmt'] = TABLE_FORMAT_ALIASES[opts['tablefmt']]
+
+        self.conf['table_opts'].update(**opts)
+
     def set_state(self, cmd):
         """
         Set the progam's runtime state according to the given command
@@ -158,21 +193,28 @@ class Squelch(object):
         # compare case-insensitively for ease of the user.  No two state
         # variable names should only differ by case, so this is quite safe
         if cmd.lower().startswith(r'\pset pager'):
-            if re.match(fr'\\pset pager {falsy}', cmd.lower()):
+            if re.match(fr'\\pset\s+pager\s+{falsy}', cmd.lower()):
                 self.state['pager'] = False
                 state_text = 'Pager usage is off.'
-            elif re.match(fr'\\pset pager {truthy}', cmd.lower()):
+            elif re.match(fr'\\pset\s+pager\s+{truthy}', cmd.lower()):
                 self.state['pager'] = True
                 state_text = 'Pager is used for long output.'
         elif cmd.lower().startswith(r'\pset footer'):
-            if re.match(fr'\\pset footer {falsy}', cmd.lower()):
+            if re.match(fr'\\pset\s+footer\s+{falsy}', cmd.lower()):
                 self.state['footer'] = False
-            elif re.match(fr'\\pset footer {truthy}', cmd.lower()):
+            elif re.match(fr'\\pset\s+footer\s+{truthy}', cmd.lower()):
                 self.state['footer'] = True
+        elif cmd.lower().startswith(r'\pset format'):
+            m = re.match(fr'\\pset\s+format\s+(.+)', cmd.lower())
+
+            if m:
+                fmt = m.groups()[0]
+                self.state['format'] = fmt
+                self.set_table_opts(tablefmt=fmt)
         elif cmd.lower().startswith(r'\set autocommit'):
-            if re.match(fr'\\set autocommit {falsy}', cmd.lower()):
+            if re.match(fr'\\set\s+autocommit\s+{falsy}', cmd.lower()):
                 self.state['AUTOCOMMIT'] = False
-            elif re.match(fr'\\set autocommit {truthy}', cmd.lower()):
+            elif re.match(fr'\\set\s+autocommit\s+{truthy}', cmd.lower()):
                 self.state['AUTOCOMMIT'] = True
 
         return state_text
