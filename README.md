@@ -1,10 +1,10 @@
 # squelch
 
-Squelch is a package providing a Simple SQL REPL Command Handler.  Squelch uses SQLAlchemy for database access and so can support any database engine that SQLAlchemy supports, thereby providing a common database client experience for any of those database engines.  Squelch is modelled on a simplified `psql`, the PostgreSQL command line client.  The Squelch CLI supports readline history and basic SQL statement tab completions.
+Squelch is a package providing a Simple [SQL](https://en.wikipedia.org/wiki/SQL) [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop) Command Handler.  Squelch uses [SQLAlchemy](https://www.sqlalchemy.org/) for database access and so can support any database engine that SQLAlchemy supports, thereby providing a common database client experience for any of those database engines.  Squelch is modelled on a simplified `psql`, the [PostgreSQL](https://www.postgresql.org/) command line client.  The Squelch [CLI](https://en.wikipedia.org/wiki/Command-line_interface) supports readline history and basic SQL statement tab completions.
 
 ## Install
 
-The package can be installed from PyPI:
+The package can be installed from [PyPI](https://pypi.org/):
 
 ```bash
 $ pip install squelch
@@ -22,7 +22,7 @@ $ python3 -m squelch
 $ squelch
 ```
 
-The only required argument is a database connection URL.  This can either be passed on the command line, via the `--url` option, or specified in a JSON configuration file given by the `--conf-file` option.  The form of the JSON configuration file is as follows:
+The only required argument is a database connection URL.  This can either be passed on the command line, via the `--url` option, or specified in a [JSON](https://en.wikipedia.org/wiki/JSON) configuration file given by the `--conf-file` option.  The form of the JSON configuration file is as follows:
 
 ```json
 {
@@ -34,7 +34,24 @@ where the `<URL>` follows the [SQLAlchemy database connection URL syntax](https:
 
 ### Running queries
 
-When running the CLI in a terminal, the user is dropped into an interactive REPL.  From here, the user is prompted for input, which can be an SQL statement to be sent to the database engine, or a CLI command (backslash command) such as `\q` to quit the CLI.
+When running the CLI in a terminal, the user is dropped into an interactive REPL.  From here, the user is prompted for input, which can be an SQL statement to be sent to the database engine, or a CLI command (backslash command) such as `\q` to quit the CLI:
+
+```
+$ python -m squelch -c tests/data/test.json 
+squelch (0.3.0)
+Type "help" for help.
+
+tests/data/test.db => select * from data;
+ id   | name   | status   | key
+------+--------+----------+-----------
+ 1    | pmb    | 0        | 0000-0000
+ 2    | abc    | 0        | 0000-0001
+ 3    | def    | 0        | 0000-0002
+ 4    | ghi    | 1        | 0000-0003
+(4 rows)
+
+tests/data/test.db => \q
+```
 
 Alternatively, the CLI can be called as a *one-shot* by providing a query on `stdin`, thereby allowing it to be called in scripts.
 
@@ -61,10 +78,9 @@ select * from data where id = 1;
 select * from status where status = 1;
 ```
 
-we would get:
+the result would be:
 
 ```bash
-
 $ python -m squelch -c tests/data/test.json < tests/data/queries.sql
  id   | name   | status   | key
 ------+--------+----------+-----------
@@ -83,6 +99,20 @@ $ python -m squelch -c tests/data/test.json < tests/data/queries.sql
 --------+----------
  ghi    | 1
 (1 row)
+
+```
+
+#### Machine-readable data in scripts
+
+It's likely that when calling the CLI from a script, the user is less interested in the data being laid out in a human-readable table, rather, they probably want it as machine-readable data.  The table format can be set (using the `--pset` option) to `csv` so that the table is printed as [CSV](https://en.wikipedia.org/wiki/Comma-separated_values).  Additionally, the table footer can be turned off (again using `--pset`) so that the result is just a simple CSV table.  Taking our example from earlier, the result would be:
+
+```bash
+$ echo "select * from data;" | python -m squelch -c tests/data/test.json --pset format=csv --pset footer=off
+id,name,status,key
+1,pmb,0,0000-0000
+2,abc,0,0000-0001
+3,def,0,0000-0002
+4,ghi,1,0000-0003
 
 ```
 
