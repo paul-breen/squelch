@@ -275,6 +275,7 @@ Help
 Informational
   \d                     list tables, views, and sequences
   \d      NAME           describe table or view
+  \di     [NAME]         list indexes
   \ds     [NAME]         list sequences
   \dt     [NAME]         list tables
   \dv     [NAME]         list views
@@ -571,6 +572,8 @@ Variables
         """
         Clean the raw input query
 
+        :param raw: The raw query
+        :type raw: str
         :param terminator: A query terminator to be stripped from the query
         :type terminator: str
         :returns: The raw stripped query
@@ -910,7 +913,7 @@ Variables
         such as the quit command
         """
 
-        prompt = f"{self.conn.engine.url.database} => "
+        prompt = f"{self.conn.engine.url.database}=> "
         self.init_repl()
         atexit.register(self.complete_repl)
 
