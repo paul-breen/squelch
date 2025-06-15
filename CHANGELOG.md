@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - 2025-06-15
+## [v0.4.0] - 2025-06-15
 
 ### Added
 

@@ -27,7 +27,7 @@ def unconfigured_squelch(init_squelch):
     return f
 
 def test_version():
-    assert squelch.__version__ == '0.3.1'
+    assert squelch.__version__ == '0.4.0'
 
 @pytest.mark.parametrize(['name','conf_dir','expected'], [
 ('non-existent', base + '/data', None),
