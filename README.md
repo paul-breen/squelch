@@ -22,7 +22,16 @@ $ python3 -m squelch
 $ squelch
 ```
 
-The only required argument is a database connection URL.  This can either be passed on the command line, via the `--url` option, or specified in a [JSON](https://en.wikipedia.org/wiki/JSON) configuration file given by the `--conf-file` option.  The form of the JSON configuration file is as follows:
+The only required argument is a database connection URL.  This can either be passed on the command line, via the `--url` option, or specified in a [JSON](https://en.wikipedia.org/wiki/JSON) configuration file.
+
+The configuration file can be specified in one of the following ways:
+
+* The full path to a configuration file can be given by the `--conf-file` option.
+* A configuration name can be given as the first positional argument.
+
+A configuration name is the basename (without the `.json` suffix) of a configuration file in the [squelch configuration directory](#configuration-directory).  Using a configuration name is a convenience that simplifies the invocation of the CLI.
+
+The form of the JSON configuration file is as follows:
 
 ```json
 {
@@ -31,6 +40,25 @@ The only required argument is a database connection URL.  This can either be pas
 ```
 
 where the `<URL>` follows the [SQLAlchemy database connection URL syntax](https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls).  An advantage of using a configuration file is that it avoids providing database login credentials in plain text on the command line.
+
+### Configuration directory
+
+The configuration directory is `$XDG_CONFIG_HOME/squelch`.  If the environment variable `$XDG_CONFIG_HOME` is not set in the caller environment, then it falls back to `~/.config/squelch`, as per the [XDG specifications](https://specifications.freedesktop.org/basedir-spec/latest/).
+
+### Specifying a configuration name
+
+Given the following configuration directory contents:
+
+```bash
+$ ls ~/.config/squelch/
+extras.json  min.json  queries.sql  test.json
+```
+
+the user can pass the configuration name `extras` as the first positional argument, and the CLI will find the full path to the corresponding configuration file (`~/.config/squelch/extras.json`) and use it to connect to the database specified by the URL in the JSON object:
+
+```bash
+$ squelch extras
+```
 
 ### Running queries
 
@@ -121,14 +149,18 @@ id,name,status,key
 ```
 usage: squelch [-h] [-c CONF_FILE] [-u URL] [-S [NAME=VALUE [NAME=VALUE ...]]]
                [-P [NAME=VALUE [NAME=VALUE ...]]] [-v] [-V]
+               [conf_name]
 
 Squelch is a Simple SQL REPL Command Handler.
+
+positional arguments:
+  conf_name             The name of a JSON configuration in the default
+                        configuration directory (/home/pbree/.config/squelch).
 
 optional arguments:
   -h, --help            show this help message and exit
   -c CONF_FILE, --conf-file CONF_FILE
-                        The full path to a JSON configuration file. It
-                        defaults to ./squelch.json.
+                        The full path to a JSON configuration file.
   -u URL, --url URL     The database connection URL, as required by
                         sqlalchemy.create_engine().
   -S [NAME=VALUE [NAME=VALUE ...]], --set [NAME=VALUE [NAME=VALUE ...]]

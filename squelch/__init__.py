@@ -1,3 +1,9 @@
+"""
+Package providing a Simple SQL REPL Command Handler
+
+Squelch uses SQLAlchemy for database access and so can support any database engine that SQLAlchemy supports, thereby providing a common database client experience for any of those database engines.
+"""
+
 __version__ = '0.3.1'
 
 import sys
