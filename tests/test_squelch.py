@@ -1,5 +1,6 @@
 import os
 import logging
+from pathlib import Path
 
 import pytest
 from sqlalchemy.sql import text
@@ -27,6 +28,23 @@ def unconfigured_squelch(init_squelch):
 
 def test_version():
     assert squelch.__version__ == '0.3.1'
+
+@pytest.mark.parametrize(['name','conf_dir','expected'], [
+('non-existent', base + '/data', None),
+('extras', base + '/data', Path(base + '/data/extras.json')),
+('min', base + '/data', Path(base + '/data/min.json')),
+('test', base + '/data', Path(base + '/data/test.json')),
+# conf name doesn't require .json suffix - it will just be ignored if present
+('non-existent.json', base + '/data', None),
+('extras.json', base + '/data', Path(base + '/data/extras.json')),
+# conf_dir doesn't exist or is not a directory
+('extras', base + '/non-existent-dir', None),
+('extras', base + '/data/extras.json', None),
+])
+def test_find_conf_file_in_dir(unconfigured_squelch, name, conf_dir, expected):
+    f = unconfigured_squelch
+    conf_file = f.find_conf_file_in_dir(name, conf_dir=conf_dir)
+    assert conf_file == expected
 
 @pytest.mark.parametrize(['file','expected'], [
 ('non-existent.json', {}),

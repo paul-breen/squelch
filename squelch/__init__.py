@@ -1,6 +1,7 @@
 __version__ = '0.3.1'
 
 import sys
+import os
 import logging
 from pathlib import Path
 import atexit
@@ -20,7 +21,9 @@ from tabulate import tabulate, simple_separated_format
 PROGNAME = __name__
 
 DEF_TABLE_FORMAT = 'presto'
-DEF_CONF_FILE = './squelch.json'
+# https://specifications.freedesktop.org/basedir-spec/latest/
+DEF_CONF_DIR = Path(os.environ.get('XDG_CONFIG_HOME', '~/.config')).expanduser() / 'squelch'
+DEF_CONF_FILE = DEF_CONF_DIR / 'squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
 DEF_STATE = {'pager': True, 'footer': True, 'format': DEF_TABLE_FORMAT, 'AUTOCOMMIT': True}
@@ -79,6 +82,41 @@ class Squelch(object):
         self.params = {}
         self.result = None
         self.completions = SQL_COMPLETIONS
+
+    def find_conf_file_in_dir(self, name, conf_dir=DEF_CONF_DIR):
+        """
+        Find the configuration file given the file basename sans suffix
+
+        For example, given the configuration name 'db', find the file called
+        `db.json` in the given `conf_dir`.  As a convenience, if the
+        configuration name is provided with a suffix (e.g. 'db.json'), then
+        the file path will still be found and returned.
+
+        :param name: The configuration name
+        :type name: str
+        :param conf_dir: The directory path containing configuration files
+        :type conf_dir: str
+        :returns: The configuration path or None if not found
+        :rtype: pathlib.PosixPath or None
+        """
+
+        conf_file = None
+        conf_dir = Path(conf_dir)
+
+        if conf_dir.is_dir():
+            logger.info(f"looking for configuration {name} in {conf_dir}")
+            conf_files = [f for f in conf_dir.iterdir() if f.is_file()]
+            name = Path(name)
+
+            for file in conf_files:
+                if file.stem == name.stem:
+                    conf_file = file
+                    break
+
+        if conf_file:
+            logger.info(f"found configuration file {file} from name {name}")
+
+        return conf_file
 
     def get_conf(self, file=DEF_CONF_FILE):
         """

@@ -1,8 +1,9 @@
 import sys
 import argparse
 import logging
+from pathlib import Path
 
-from squelch import Squelch, __version__, PROGNAME, DEF_CONF_FILE
+from squelch import Squelch, __version__, PROGNAME, DEF_CONF_DIR
 
 STATE_OPTS = ['set','pset']
 NON_CONF_OPTS = STATE_OPTS
@@ -32,7 +33,11 @@ From the SQLAlchemy documentation:
 """
 
     parser = argparse.ArgumentParser(description='Squelch is a Simple SQL REPL Command Handler.', epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter, prog=PROGNAME)
-    parser.add_argument('-c', '--conf-file', help=f"The full path to a JSON configuration file.  It defaults to {DEF_CONF_FILE}.")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('conf_name', help=f"The name of a JSON configuration in the default configuration directory ({DEF_CONF_DIR}).", nargs='?')
+    group.add_argument('-c', '--conf-file', help=f"The full path to a JSON configuration file.")
+
     parser.add_argument('-u', '--url', help='The database connection URL, as required by sqlalchemy.create_engine().')
     parser.add_argument('-S', '--set', help='Set state variable NAME to VALUE.', metavar='NAME=VALUE', nargs='*', action='extend')
     parser.add_argument('-P', '--pset', help='Set printing state variable NAME to VALUE.', metavar='NAME=VALUE', nargs='*', action='extend')
@@ -140,8 +145,33 @@ def consolidate_conf(squelch, args):
     :rtype: dict
     """
 
-    if args.conf_file:
-        squelch.get_conf(file=args.conf_file)
+    if args.conf_file or args.conf_name:
+        if args.conf_file:
+            conf_file = Path(args.conf_file)
+
+            if not conf_file.is_file():
+                err_msg = f"No such file or directory: {conf_file}"
+
+                if args.verbose > 1:
+                    raise FileNotFoundError(err_msg)
+                else:
+                    print(err_msg, file=sys.stderr)
+                    sys.exit(1)
+        elif args.conf_name:
+            conf_file = squelch.find_conf_file_in_dir(args.conf_name)
+
+            if not (conf_file and conf_file.is_file()):
+                err_msg =f"Failed to find configuration file from given configuration name: {args.conf_name}"
+
+                if args.verbose > 1:
+                    raise ValueError(err_msg)
+                else:
+                    print(err_msg, file=sys.stderr)
+                    sys.exit(1)
+
+        if conf_file and conf_file.is_file():
+            logger.debug(f"using configuration file {conf_file}")
+            squelch.get_conf(file=conf_file)
 
     squelch.conf = update_conf_from_cmdln(squelch.conf, args)
 
