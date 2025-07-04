@@ -335,6 +335,43 @@ def test_handle_metadata_command(unconfigured_squelch, raw, expected, mocker, ca
         else:
             far.assert_called_once()
 
+@pytest.mark.parametrize(['raw','expected','handle_comments'], [
+# Use the default setting of HANDLE_COMMENTS
+('select * from data;', 'select * from data;', None),
+("-- select * from data;", "", None),
+("/* select * from data; */", "", None),
+("select * from data /* order by id */;", "select * from data ;", None),
+("select * from data where c1 = '/**/';", "select * from data where c1 = '/**/';", None),
+("select * from data where c1 = '/* comment */';", "select * from data where c1 = '/* comment */';", None),
+("select * from data where c1 = '/*' and c2 = '*/';", "select * from data where c1 = '/*' and c2 = '*/';", None),
+("select * from data where c1 like '/*%' and c2 like '%*/';", "select * from data where c1 like '/*%' and c2 like '%*/';", None),
+("select * from data where c1 like '/*%' and c2 like '%*/' order by id;", "select * from data where c1 like '/*%' and c2 like '%*/' order by id;", None),
+("update data set name = 'new-name' where /* name = 'old-name' */ id = 10;", "update data set name = 'new-name' where  id = 10;", None),
+("update data set name = '/*new-name*/' where id = 10;", "update data set name = '/*new-name*/' where id = 10;", None),
+# Explicitly set comments to be handled client-side
+('select * from data;', 'select * from data;', True),
+("-- select * from data;", "", True),
+("/* select * from data; */", "", True),
+("select * from data /* order by id */;", "select * from data ;", True),
+# Explicitly set comments to be passed through and handled server-side
+('select * from data;', 'select * from data;', False),
+("-- select * from data;", "-- select * from data;", False),
+("/* select * from data; */", "/* select * from data; */", False),
+("select * from data /* order by id */;", "select * from data /* order by id */;", False),
+])
+def test_remove_commented_text(unconfigured_squelch, raw, expected, handle_comments):
+    f = unconfigured_squelch
+
+    if handle_comments is not None:
+        f.state['HANDLE_COMMENTS'] = handle_comments
+
+    if f.state['HANDLE_COMMENTS']:
+        actual = f.remove_commented_text(raw)
+    else:
+        actual = raw
+
+    assert actual == expected
+
 @pytest.mark.parametrize(['raw','query','params','autocommit'], [
 ("begin", text('begin'), {}, False),
 ("rollback", text('rollback'), {}, True),

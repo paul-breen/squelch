@@ -32,7 +32,7 @@ DEF_CONF_DIR = Path(os.environ.get('XDG_CONFIG_HOME', '~/.config')).expanduser()
 DEF_CONF_FILE = DEF_CONF_DIR / 'squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
-DEF_STATE = {'pager': True, 'footer': True, 'format': DEF_TABLE_FORMAT, 'AUTOCOMMIT': True}
+DEF_STATE = {'pager': True, 'footer': True, 'format': DEF_TABLE_FORMAT, 'AUTOCOMMIT': True, 'HANDLE_COMMENTS': True}
 DEF_MIN_FOOTER = '\n'             # Blank line to separate table from prompt
 
 URL_CRED_PATTERN = r'://(.+)@'
@@ -57,6 +57,8 @@ class Squelch(object):
         'history_file': DEF_HISTORY_FILE,
         'query_quoted_string_pattern': r"'[^']+'",
         'query_params_pattern': r':([a-z0-9_.]+)',
+        'query_line_comment_pattern': r'^--.*$',
+        'query_block_comment_pattern': r"(?<!')(/\*.*\*/)(?!')",
         'repl_commands': {
             'quit': [r'\q'],
             'state': [r'\set', r'\pset'],
@@ -260,6 +262,11 @@ class Squelch(object):
                 self.state['AUTOCOMMIT'] = False
             elif re.match(fr'\\set\s+autocommit\s+{truthy}', cmd.lower()):
                 self.state['AUTOCOMMIT'] = True
+        elif cmd.lower().startswith(r'\set handle_comments'):
+            if re.match(fr'\\set\s+handle_comments\s+{falsy}', cmd.lower()):
+                self.state['HANDLE_COMMENTS'] = False
+            elif re.match(fr'\\set\s+handle_comments\s+{truthy}', cmd.lower()):
+                self.state['HANDLE_COMMENTS'] = True
 
         return state_text
 
@@ -826,6 +833,28 @@ Variables
         if table:
             self.print_data(table)
 
+    def remove_commented_text(self, raw):
+        """
+        Remove any commented-out text from the given query
+
+        :param raw: The raw stripped input (a query)
+        :type raw: str
+        :returns: The raw query with any commented-out text removed
+        :rtype: str
+        """
+
+        keys = ['query_line_comment_pattern','query_block_comment_pattern']
+
+        for key in keys:
+            pat = self.get_conf_item(key)
+            clean = re.sub(pat, '', raw)
+
+            if clean != raw:
+                logger.debug(f"raw query with commented text removed: '{clean}'")
+                raw = clean
+
+        return raw
+
     def handle_query(self, raw):
         """
         Process the given query
@@ -834,21 +863,28 @@ Variables
         :type raw: str
         """
 
-        cmd = raw.split()[0].lower()
+        # Handle comments client-side, otherwise they're handled server-side
+        if self.state['HANDLE_COMMENTS']:
+            raw = self.remove_commented_text(raw)
 
-        # Disable autocommit during an explicit transaction
-        if cmd == 'begin':
-            self.state['AUTOCOMMIT'] = False
+        if len(raw) > 0:
+            cmd = raw.split()[0].lower()
 
-        self.query = text(raw)
-        self.params = self.prompt_for_query_params(raw)
-        self.exec_query(self.query, self.params)
-        self.present_result()
+            # Disable autocommit during an explicit transaction
+            if cmd == 'begin':
+                self.state['AUTOCOMMIT'] = False
 
-        if cmd == 'rollback':
-            self.state['AUTOCOMMIT'] = True
-        elif cmd == 'commit':
-            self.state['AUTOCOMMIT'] = True
+            self.query = text(raw)
+            self.params = self.prompt_for_query_params(raw)
+            self.exec_query(self.query, self.params)
+            self.present_result()
+
+            if cmd == 'rollback':
+                self.state['AUTOCOMMIT'] = True
+            elif cmd == 'commit':
+                self.state['AUTOCOMMIT'] = True
+        else:
+            logger.debug('raw query is empty: nothing to do')
 
     def process_input(self, raw):
         """
