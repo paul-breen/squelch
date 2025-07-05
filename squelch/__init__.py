@@ -653,6 +653,30 @@ Variables
 
         return self.clean_raw_input(input(prompt), terminator=terminator)
 
+    def handle_quit_command(self, raw=None, exit_code=0):
+        """
+        Process the given quit command
+
+        :param raw: The raw stripped input (a REPL quit command)
+        :type raw: str
+        :param exit_code: The exit code to quit with
+        :type exit_code: int
+        """
+
+        try:
+            if self.conn:
+                self.conn.close()
+        except Exception as e:
+            msg = f'Exception occurred during connection close: "{e}".'
+            exit_code = 1
+
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(chain=False)
+            else:
+                print(msg, file=sys.stderr)
+
+        sys.exit(exit_code)
+
     def handle_state_command(self, raw):
         """
         Process the given state change command
@@ -937,7 +961,7 @@ Variables
 
             if cmd in self.get_conf_item('repl_commands')['quit']:
                 logger.info('quitting')
-                sys.exit(0)
+                self.handle_quit_command(exit_code=0)
             elif cmd in self.get_conf_item('repl_commands')['state']:
                 self.handle_state_command(raw)
             elif cmd in self.get_conf_item('repl_commands')['metadata']:
@@ -953,7 +977,7 @@ Variables
 
             if q.lower().startswith('y'):
                 logger.info('no input, so quitting')
-                sys.exit(0)
+                self.handle_quit_command(exit_code=0)
 
     def input_completions(self, text, state):
         """
