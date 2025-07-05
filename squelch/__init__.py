@@ -21,7 +21,7 @@ import warnings
 
 from sqlalchemy import create_engine, MetaData, Table, inspect
 from sqlalchemy.sql import text
-from sqlalchemy.exc import DatabaseError, NoSuchTableError
+from sqlalchemy.exc import DatabaseError, NoSuchTableError, NoInspectionAvailable
 from tabulate import tabulate, simple_separated_format
 
 PROGNAME = __name__
@@ -701,17 +701,26 @@ Variables
         :rtype: list
         """
 
+        rel_names = []
+
         # Using the Inspector for introspection is much faster than using
         # MetaData.  Hence, even though it means pulling in more functionality
         # from SQLAlchemy (we have to use MetaData for table metadata), it is
         # worth it
-        insp = inspect(self.conn.engine)
-        rel_names = []
+        try:
+            insp = inspect(self.conn.engine)
+        except (NoInspectionAvailable, AttributeError) as e:
+            msg = f'Error trying to discover available relations: {e}.'
 
-        for type_name in types:
-            rel_names += [i for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(chain=False)
+            else:
+                print(msg, file=sys.stderr)
+        else:
+            for type_name in types:
+                rel_names += [i for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
 
-        rel_names.sort()
+            rel_names.sort()
 
         return rel_names
 
@@ -728,17 +737,26 @@ Variables
 
         rel_md = None
         md = MetaData()
-        md.reflect(bind=self.conn.engine)
 
         try:
-            rel_md = Table(name, md, autoload_with=self.conn.engine)
-        except NoSuchTableError as e:
-            msg = f'Did not find any relation named "{e}".'
+            md.reflect(bind=self.conn.engine)
+        except NotImplementedError as e:
+            msg = 'Engine does not support discovery of relation metadata.'
 
             if logger.isEnabledFor(logging.DEBUG):
                 traceback.print_exc(chain=False)
             else:
                 print(msg, file=sys.stderr)
+        else:
+            try:
+                rel_md = Table(name, md, autoload_with=self.conn.engine)
+            except NoSuchTableError as e:
+                msg = f'Did not find any relation named "{e}".'
+
+                if logger.isEnabledFor(logging.DEBUG):
+                    traceback.print_exc(chain=False)
+                else:
+                    print(msg, file=sys.stderr)
 
         return rel_md
 
@@ -753,19 +771,29 @@ Variables
         """
 
         table_opts = self.get_conf_item('table_opts')
-        insp = inspect(self.conn.engine)
         headers = ['Name','Type']
         rel_names = []
 
-        for type_name in types:
-            if type_name.lower() == 'index':
-                res = self._get_relation_type_names(insp.get_multi_indexes, type_name)
-                rel_names += [[v['name'], type_name, k[1]] for k in res for v in res[k]]
-                headers = ['Name','Type','Table']
-            else:
-                rel_names += [[i, type_name] for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
+        try:
+            insp = inspect(self.conn.engine)
+        except (NoInspectionAvailable, AttributeError) as e:
+            msg = f'Error trying to discover available relations: {e}.'
 
-        rel_names.sort()
+            if logger.isEnabledFor(logging.DEBUG):
+                traceback.print_exc(chain=False)
+            else:
+                print(msg, file=sys.stderr)
+        else:
+            for type_name in types:
+                if type_name.lower() == 'index':
+                    res = self._get_relation_type_names(insp.get_multi_indexes, type_name)
+                    rel_names += [[v['name'], type_name, k[1]] for k in res for v in res[k]]
+                    headers = ['Name','Type','Table']
+                else:
+                    rel_names += [[i, type_name] for i in self._get_relation_type_names(getattr(insp, f"get_{type_name}_names"), type_name)]
+
+            rel_names.sort()
+
         table = 'List of relations\n'
         table += tabulate(rel_names, headers=headers, **table_opts)
         table += self.get_table_footer_text(len(rel_names))
