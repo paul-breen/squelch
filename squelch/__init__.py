@@ -724,7 +724,7 @@ Variables
             if state_text:
                 print(state_text)
         else:
-            print(self.state)
+            print('\n'.join([f"{k} = {v}" for k,v in self.state.items()]))
 
     def _get_relation_type_names(self, func, type_name):
         """

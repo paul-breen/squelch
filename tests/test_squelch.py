@@ -323,7 +323,7 @@ def test_handle_state_command(unconfigured_squelch, raw, expected, capsys):
     f = unconfigured_squelch
 
     if expected is None:
-        expected = str(f.state)
+        expected = '\n'.join([f"{k} = {v}" for k,v in f.state.items()])
 
     f.handle_state_command(raw)
     captured = capsys.readouterr()
