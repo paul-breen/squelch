@@ -21,7 +21,7 @@ import warnings
 
 from sqlalchemy import create_engine, MetaData, Table, inspect
 from sqlalchemy.sql import text
-from sqlalchemy.exc import DatabaseError, NoSuchTableError, NoInspectionAvailable, SAWarning
+from sqlalchemy.exc import NoSuchTableError, NoInspectionAvailable, SAWarning
 from tabulate import tabulate, simple_separated_format
 
 PROGNAME = __name__
@@ -445,7 +445,7 @@ Variables
         try:
             self.result = self.conn.execute(query, params)
             self.state.get('AUTOCOMMIT') and self.conn.commit()
-        except DatabaseError as e:
+        except Exception as e:
             if logger.isEnabledFor(logging.DEBUG):
                 traceback.print_exc(chain=False)
             else:
