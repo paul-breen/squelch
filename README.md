@@ -155,7 +155,7 @@ Squelch is a Simple SQL REPL Command Handler.
 
 positional arguments:
   conf_name             The name of a JSON configuration in the default
-                        configuration directory (/home/pbree/.config/squelch).
+                        configuration directory (/home/<user>/.config/squelch).
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -168,7 +168,8 @@ optional arguments:
   -P [NAME=VALUE [NAME=VALUE ...]], --pset [NAME=VALUE [NAME=VALUE ...]]
                         Set printing state variable NAME to VALUE.
   -v, --verbose         Turn verbose messaging on. The effects of this option
-                        are incremental.
+                        are incremental. The value is used to set the
+                        VERBOSITY state variable.
   -V, --version         show program's version number and exit
 
 Database Connection URL

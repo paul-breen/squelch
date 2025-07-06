@@ -41,7 +41,7 @@ From the SQLAlchemy documentation:
     parser.add_argument('-u', '--url', help='The database connection URL, as required by sqlalchemy.create_engine().')
     parser.add_argument('-S', '--set', help='Set state variable NAME to VALUE.', metavar='NAME=VALUE', nargs='*', action='extend')
     parser.add_argument('-P', '--pset', help='Set printing state variable NAME to VALUE.', metavar='NAME=VALUE', nargs='*', action='extend')
-    parser.add_argument('-v', '--verbose', help='Turn verbose messaging on.  The effects of this option are incremental.', action='count', default=0)
+    parser.add_argument('-v', '--verbose', help='Turn verbose messaging on.  The effects of this option are incremental.  The value is used to set the VERBOSITY state variable.', action='count', default=0)
     parser.add_argument('-V', '--version', action='version', version=f"%(prog)s {__version__}")
 
     args = parser.parse_args()
