@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.5.0] - 2025-07-06
+
+### Added
+
+- Add support for setting the message verbosity level at runtime in the REPL
+- Add support for handling comments in DML statements
+
+### Changed
+
+- Improve broad DB dialect exception handling (for queries, metadata queries, and quitting)
+- Improve the reporting of state variables
+
 ## [v0.4.0] - 2025-06-15
 
 ### Added
