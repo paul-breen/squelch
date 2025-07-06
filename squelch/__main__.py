@@ -48,27 +48,25 @@ From the SQLAlchemy documentation:
 
     return args
 
-def configure_logging(args):
+def configure_logging(squelch, args):
     """
     Configure logging based on the command line arguments
 
+    :param squelch: The instantiated Squelch object
+    :type squelch: Squelch
     :param args: The command line arguments
     :type args: argparse.Namespace
     """
 
-    # Enable info messages in this library
-    if args.verbose:
-        logger.setLevel(logging.INFO)
-        logging.getLogger(__package__).setLevel(logging.INFO)
+    name = 'VERBOSITY'
+    value = args.verbose
 
-        # Enable debug messages in this library
-        if args.verbose > 1:
-            logger.setLevel(logging.DEBUG)
-            logging.getLogger(__package__).setLevel(logging.DEBUG)
+    # Construct command in form it would be issued in client
+    cmd = fr"\set {name} {value}"
+    state_text = squelch.set_state(cmd)
 
-        # Enable debug messages in this library and dependent libraries
-        if args.verbose > 2:
-            logging.getLogger().setLevel(logging.DEBUG)
+    if state_text:
+        logger.debug(state_text)
 
 def update_conf_from_cmdln(conf, args):
     """
@@ -182,7 +180,7 @@ def consolidate_conf(squelch, args):
     except KeyError:
         pass
 
-    configure_logging(args)
+    configure_logging(squelch, args)
 
     set_state_from_cmdln(squelch, args)
 
@@ -219,7 +217,7 @@ def main():
 
     args = parse_cmdln()
     squelch = Squelch()
-    configure_logging(args)
+    configure_logging(squelch, args)
     consolidate_conf(squelch, args)
 
     connect(squelch, args)

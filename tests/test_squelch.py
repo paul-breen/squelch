@@ -105,6 +105,19 @@ def test_set_table_opts(unconfigured_squelch, opts, changes):
     actual = f.conf['table_opts']
     assert actual == expected
 
+@pytest.mark.parametrize(['opts','expected'], [
+({'verbosity': 0}, logging.WARNING),
+({'verbosity': 1}, logging.INFO),
+({'verbosity': 2}, logging.DEBUG),
+# We don't support negative verbosity but it will match the non-zero test
+({'verbosity': -1}, logging.INFO),
+])
+def test_set_message_opts(unconfigured_squelch, opts, expected, mocker):
+    f = unconfigured_squelch
+    lr = mocker.patch('squelch.logger.setLevel')
+    f.set_message_opts(**opts)
+    lr.assert_called_with(expected)
+
 @pytest.mark.parametrize(['state','key','cmd','expected'], [
 ({'pager': True}, 'pager', r'\pset pager off', False),
 ({'pager': False}, 'pager', r'\pset pager off', False),
@@ -120,6 +133,12 @@ def test_set_table_opts(unconfigured_squelch, opts, changes):
 ({'AUTOCOMMIT': True}, 'AUTOCOMMIT', r'\set AUTOCOMMIT off', False),
 ({'AUTOCOMMIT': False}, 'AUTOCOMMIT', r'\set AUTOCOMMIT on', True),
 ({'AUTOCOMMIT': True}, 'AUTOCOMMIT', r'\set autocommit off', False),
+({'VERBOSITY': 0}, 'VERBOSITY', r'\set VERBOSITY 1', 1),
+({'VERBOSITY': 1}, 'VERBOSITY', r'\set VERBOSITY 0', 0),
+# We don't support text verbosity values so it will remain as-is
+({'VERBOSITY': 0}, 'VERBOSITY', r'\set VERBOSITY on', 0),
+({'VERBOSITY': 1}, 'VERBOSITY', r'\set VERBOSITY off', 1),
+({'VERBOSITY': 2}, 'VERBOSITY', r'\set VERBOSITY off', 2),
 ])
 def test_set_state(unconfigured_squelch, state, key, cmd, expected):
     f = unconfigured_squelch
@@ -156,6 +175,7 @@ def test_exec_query(unconfigured_squelch, query, params, mocker, capsys):
 def test_exec_query_debug(unconfigured_squelch, query, params, mocker, capsys, caplog):
     caplog.set_level(logging.DEBUG)
     f = unconfigured_squelch
+    f.set_state(r'\set VERBOSITY 2')   # Sets logging.DEBUG
     f.conn = mocker.patch('sqlalchemy.engine.base.Connection')
     mocker.patch.object(f.conn, 'begin')
     mocker.patch.object(f.conn, 'execute', side_effect=DatabaseError('sentinel text', {}, Exception))

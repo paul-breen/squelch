@@ -21,7 +21,7 @@ import warnings
 
 from sqlalchemy import create_engine, MetaData, Table, inspect
 from sqlalchemy.sql import text
-from sqlalchemy.exc import DatabaseError, NoSuchTableError, NoInspectionAvailable
+from sqlalchemy.exc import DatabaseError, NoSuchTableError, NoInspectionAvailable, SAWarning
 from tabulate import tabulate, simple_separated_format
 
 PROGNAME = __name__
@@ -32,7 +32,7 @@ DEF_CONF_DIR = Path(os.environ.get('XDG_CONFIG_HOME', '~/.config')).expanduser()
 DEF_CONF_FILE = DEF_CONF_DIR / 'squelch.json'
 DEF_HISTORY_FILE = Path('~/.squelch_history').expanduser()
 DEF_CONF = {}
-DEF_STATE = {'pager': True, 'footer': True, 'format': DEF_TABLE_FORMAT, 'AUTOCOMMIT': True, 'HANDLE_COMMENTS': True}
+DEF_STATE = {'pager': True, 'footer': True, 'format': DEF_TABLE_FORMAT, 'AUTOCOMMIT': True, 'HANDLE_COMMENTS': True, 'VERBOSITY': 0}
 DEF_MIN_FOOTER = '\n'             # Blank line to separate table from prompt
 
 URL_CRED_PATTERN = r'://(.+)@'
@@ -219,6 +219,32 @@ class Squelch(object):
 
         self.conf['table_opts'].update(**opts)
 
+    def set_message_opts(self, verbosity=0):
+        """
+        Set the progam's message options
+
+        :param verbosity: The verbosity level of the emitted messages
+        :type verbosity: int
+        """
+
+        # Enable info messages in this library
+        if verbosity:
+            warnings.resetwarnings()
+            logger.setLevel(logging.INFO)
+            logging.getLogger(__package__).setLevel(logging.INFO)
+
+            # Enable debug messages in this library
+            if verbosity > 1:
+                logger.setLevel(logging.DEBUG)
+                logging.getLogger(__package__).setLevel(logging.DEBUG)
+
+            # Enable debug messages in this library and dependent libraries
+            if verbosity > 2:
+                logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.WARNING)
+            warnings.simplefilter('ignore', SAWarning)
+
     def set_state(self, cmd):
         """
         Set the progam's runtime state according to the given command
@@ -267,6 +293,13 @@ class Squelch(object):
                 self.state['HANDLE_COMMENTS'] = False
             elif re.match(fr'\\set\s+handle_comments\s+{truthy}', cmd.lower()):
                 self.state['HANDLE_COMMENTS'] = True
+        elif cmd.lower().startswith(r'\set verbosity'):
+            m = re.match(fr'\\set\s+verbosity\s+(\d+)', cmd.lower())
+
+            if m:
+                verbosity = int(m.groups()[0])
+                self.state['VERBOSITY'] = verbosity
+                self.set_message_opts(verbosity=verbosity)
 
         return state_text
 
